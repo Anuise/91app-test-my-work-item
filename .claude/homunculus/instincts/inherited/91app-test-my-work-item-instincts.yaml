@@ -1,0 +1,318 @@
+# Instincts generated from https://github.com/Anuise/91app-test-my-work-item
+# Generated: 2026-07-23T18:06:44.209Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: 91app-test-my-work-item-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: docs
+
+## Evidence
+
+- 2 commits analyzed
+- Detected conventional commit pattern
+- Examples: docs: 新增My Work Item編碼題目文檔, docs: add architecture decisions and version baseline
+
+---
+id: 91app-test-my-work-item-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Commit Length
+
+## Action
+
+Keep commit messages concise (~40 characters)
+
+## Evidence
+
+- Average commit message length: 40 chars
+- Based on 2 commits
+
+---
+id: 91app-test-my-work-item-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Naming Files
+
+## Action
+
+Use kebab-case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: kebab-case
+
+---
+id: 91app-test-my-work-item-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: 91app-test-my-work-item-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: 91app-test-my-work-item-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: 91app-test-my-work-item-instinct-file-naming
+trigger: "When creating a new file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct File Naming
+
+## Action
+
+Name the file using kebab-case
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+
+---
+id: 91app-test-my-work-item-instinct-function-naming
+trigger: "When defining a function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Function Naming
+
+## Action
+
+Use camelCase for the function name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: 91app-test-my-work-item-instinct-class-naming
+trigger: "When declaring a class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Class Naming
+
+## Action
+
+Use PascalCase for the class name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: 91app-test-my-work-item-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for the constant name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: 91app-test-my-work-item-instinct-import-style
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: 91app-test-my-work-item-instinct-export-style
+trigger: "When exporting modules or functions"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: 91app-test-my-work-item-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Git Commit Format
+
+## Action
+
+Use the conventional commit format with a prefix (e.g., 'docs:')
+
+## Evidence
+
+- Pattern in commits.prefixes
+- Seen in commit examples: 'docs: 新增My Work Item編碼題目文檔'
+
+---
+id: 91app-test-my-work-item-instinct-git-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Git Commit Length
+
+## Action
+
+Keep the commit message concise, around 40 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: 91app-test-my-work-item-instinct-docs-folder
+trigger: "When adding documentation"
+confidence: 0.9
+domain: architecture
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Docs Folder
+
+## Action
+
+Place documentation files in the 'docs' folder
+
+## Evidence
+
+- Pattern in architecture.folderStructure.commonFolders
+
+---
+id: 91app-test-my-work-item-instinct-test-location
+trigger: "When adding test files"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: Anuise/91app-test-my-work-item
+---
+
+# 91app Test My Work Item Instinct Test Location
+
+## Action
+
+Place test files in a separate location from source files
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+
