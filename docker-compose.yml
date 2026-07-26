@@ -1,0 +1,28 @@
+# 本機開發用 Docker Compose；目前僅提供可持久化的 PostgreSQL 16 資料庫服務。
+# 極速開發：docker compose up db -d 啟動資料庫，後端以 dotnet run/watch 於本機連線。
+services:
+  db:
+    image: postgres:16
+    container_name: my-work-item-db
+    # 資料庫名稱與開發帳密皆由環境變數提供（見 .env.example）；未提供時採用本機開發預設值。
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-my_work_item}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    # 使用 named volume 持久化資料，容器停止或重建後資料仍保留。
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # healthcheck 讓 depends_on 與 docker compose --wait 能判斷資料庫是否就緒。
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-my_work_item}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    name: my-work-item-pgdata

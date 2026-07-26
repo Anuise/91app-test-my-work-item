@@ -6,11 +6,28 @@ Next.js 16 與 .NET 10 組成的工作項目應用。目前已完成可登入的
 
 - .NET SDK 10
 - Node.js 20 以上
-- PostgreSQL 16
+- Docker Desktop（提供本機 PostgreSQL 16 容器）
 
-先建立本機資料庫 `my_work_item`。預設開發連線為 `postgres / postgres`；若環境不同，請修改 `backend/91app-backend/appsettings.Development.json`。
+## 本機資料庫 (Docker Compose)
 
-啟動後端；啟動時會自動套用 EF Core migration 並建立種子帳號：
+以 Docker Compose 啟動可持久化的 PostgreSQL 16 容器。首次使用可複製環境設定範本（可略過，容器會採用相同的預設值）：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+| 目的 | 指令 |
+| --- | --- |
+| 啟動並等待就緒 | `docker compose up db -d --wait` |
+| 查看狀態 | `docker compose ps db` |
+| 查看日誌 | `docker compose logs -f db` |
+| 停止（保留資料） | `docker compose stop db` |
+| 重置本機資料（清空 volume） | `docker compose down -v` |
+
+- 資料以 named volume `my-work-item-pgdata` 持久化，`docker compose stop` 或重建容器後資料仍保留；只有明確執行 `docker compose down -v` 才會清空。
+- 資料庫名稱與開發帳密由 `.env` 提供（預設 `my_work_item` / `postgres` / `postgres`）；repository 不含正式環境秘密。若變更帳密或 `POSTGRES_PORT`，請同步更新 `backend/91app-backend/appsettings.Development.json` 的連線字串。
+
+啟動資料庫後即可啟動後端；啟動時會自動套用 EF Core migration 並建立種子帳號：
 
 ```powershell
 dotnet run --project backend/91app-backend/91app-backend.csproj --launch-profile http
@@ -50,6 +67,14 @@ npm run dev
 - 成功與失敗皆使用 JSON envelope；失敗回應與 `X-Trace-ID` response header 會帶回同一組 `traceId`。
 
 ## 驗證
+
+本機資料庫 smoke check（驗證容器 healthy、EF Core migration 已套用、`user`/`admin` 種子帳號可用）：
+
+```powershell
+pwsh scripts/smoke-db.ps1
+```
+
+前後端測試：
 
 ```powershell
 dotnet test backend/91app-backend.sln
