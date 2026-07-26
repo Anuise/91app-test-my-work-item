@@ -22,31 +22,57 @@ public static class DatabaseInitializer
             await context.Database.EnsureCreatedAsync();
         }
 
-        if (await context.Users.AnyAsync())
+        var createdAt = new DateTimeOffset(2026, 7, 26, 0, 0, 0, TimeSpan.Zero);
+
+        if (!await context.Users.AnyAsync())
         {
-            return;
+            var user = new User
+            {
+                Id = Guid.Parse("8d89c4b0-490b-4f58-a9ba-494bfbd5556f"),
+                Username = "user",
+                Name = "User",
+                Role = "User",
+                PasswordHash = UserPasswordHash,
+                CreatedAt = createdAt
+            };
+            var admin = new User
+            {
+                Id = Guid.Parse("88afcf77-64af-4b9b-8414-5737be0906f2"),
+                Username = "admin",
+                Name = "Admin",
+                Role = "Admin",
+                PasswordHash = AdminPasswordHash,
+                CreatedAt = createdAt
+            };
+            context.Users.AddRange(user, admin);
         }
 
-        var createdAt = new DateTimeOffset(2026, 7, 26, 0, 0, 0, TimeSpan.Zero);
-        var user = new User
+        if (!await context.WorkItems.AnyAsync())
         {
-            Id = Guid.Parse("8d89c4b0-490b-4f58-a9ba-494bfbd5556f"),
-            Username = "user",
-            Name = "User",
-            Role = "User",
-            PasswordHash = UserPasswordHash,
-            CreatedAt = createdAt
-        };
-        var admin = new User
-        {
-            Id = Guid.Parse("88afcf77-64af-4b9b-8414-5737be0906f2"),
-            Username = "admin",
-            Name = "Admin",
-            Role = "Admin",
-            PasswordHash = AdminPasswordHash,
-            CreatedAt = createdAt
-        };
-        context.Users.AddRange(user, admin);
+            context.WorkItems.AddRange(
+                new WorkItem
+                {
+                    Id = Guid.Parse("1a1f0a3c-3b6d-4b8a-9c0a-1e2d3c4b5a61"),
+                    Title = "設定本機開發環境",
+                    CreatedAt = createdAt.AddHours(1),
+                    UpdatedAt = createdAt.AddHours(1)
+                },
+                new WorkItem
+                {
+                    Id = Guid.Parse("2b2f0b4c-4c7e-4c9b-8d1b-2f3e4d5c6b72"),
+                    Title = "撰寫個人化狀態單元測試",
+                    CreatedAt = createdAt.AddHours(2),
+                    UpdatedAt = createdAt.AddHours(2)
+                },
+                new WorkItem
+                {
+                    Id = Guid.Parse("3c3f0c5d-5d8f-4dac-9e2c-3a4f5e6d7c83"),
+                    Title = "部署至測試環境並驗證",
+                    CreatedAt = createdAt.AddHours(3),
+                    UpdatedAt = createdAt.AddHours(3)
+                });
+        }
+
         await context.SaveChangesAsync();
     }
 }

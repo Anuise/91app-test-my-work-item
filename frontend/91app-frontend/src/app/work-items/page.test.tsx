@@ -17,11 +17,21 @@ describe("工作項目登入狀態", () => {
   beforeEach(() => {
     getCookie.mockReturnValue({ value: "signed-jwt" });
     redirect.mockReset();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      success: true,
-      data: { id: "user-id", name: "User", role: "User" },
-      message: "登入狀態有效",
-    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/auth/session")) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { id: "user-id", name: "User", role: "User" },
+          message: "登入狀態有效",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        data: [],
+        message: "取得工作項目列表成功",
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
   });
 
   test("重新整理後由伺服器驗證 HttpOnly session", async () => {
