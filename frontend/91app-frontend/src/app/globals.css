@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07111f;
-  --foreground: #f8fafc;
+  /* ADR 0009：淺色微光玻璃底色與可讀深色文字 */
+  --background: #eff6ff;
+  --foreground: #0f172a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-mono: Consolas, "Courier New", monospace;
 }
 
@@ -18,9 +19,10 @@
 
 body {
   margin: 0;
-  background: var(--background);
+  /* ADR 0009：柔和淡藍紫漸層背景 */
+  background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
 button,
