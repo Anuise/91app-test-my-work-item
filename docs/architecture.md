@@ -14,8 +14,8 @@
 | Tailwind CSS | 4 | 已落地 |
 | TypeScript | 5 | 已落地 |
 | .NET SDK / Runtime | 10 | 已落地 |
-| PostgreSQL | 16 | 已決策，待落地 |
-| EF Core / Npgsql | 待導入時決定 | 已決策，待落地 |
+| PostgreSQL | 16 | 已落地 |
+| EF Core / Npgsql | 10 | 已落地 |
 | TanStack Query | 待導入時決定 | 已決策，待落地 |
 | Docker / Docker Compose | 不鎖定版本 | 已決策，待落地 |
 
