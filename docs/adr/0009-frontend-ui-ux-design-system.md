@@ -21,7 +21,7 @@
    - 使用 Google Fonts **Inter** / **Roboto**。
 3. **圖標規範**：
    - **嚴禁使用 Emoji 做為控制圖標**（如 🎨, 🚀, ⚙️）。
-   - 統一使用向量 SVG 圖標庫（如 `@phosphor-icons/react` 或 `lucide-react`）。
+   - 統一使用向量 SVG 圖標庫，**定案為 `lucide-react`**（見下方補註 A）。
 4. **UX 與微互動規範**：
    - 所有點擊元件需有 `cursor-pointer`。
    - 轉場動畫統一 `150ms - 250ms ease-in-out`。
@@ -32,3 +32,22 @@
 ### 優點
 - **視覺震撼度**：現代 Glassmorphism 與半透明毛玻璃效果帶來極為 Premium 的畫面體驗。
 - **元件高度規範化**：狀態標籤與圖標規範確保跨頁面一致性。
+
+## 補註 (Addendum)
+
+- **日期**：2026-07-27
+- **來源**：設計系統 grill 定案，記錄不在 #21 動工範圍的兩項決策，供後續 feature ticket 銜接（見 #22）。
+
+### 補註 A：SVG icon 庫定案
+
+- 向量 SVG 圖標庫定案為 **`lucide-react`**（取代原「`@phosphor-icons/react` 或 `lucide-react`」兩案並列）。
+- 本次（#21）**緩裝**：暫不加入 `lucide-react` 相依，待第一個實際需要 icon 的頁面落地時再引入，避免安裝未使用的相依。
+
+### 補註 B：工作項目列表與狀態 Capsule 的後端相依
+
+- 工作項目列表與狀態 Capsule（待確認／已確認）**blocked 於尚未存在的後端 API `/api/v1/work-items`**。
+- 該功能屬**獨立 feature**（見 #7–#13），**非本設計系統合規（design compliance）範圍**；ADR 0009 僅規範其 UI 呈現，不負責後端資料串接。
+
+### 補註 C：後續 Work Item feature 落地的沿用要求
+
+- 現有 Work Item feature issues（**#7 起**）落地時，UI 需**沿用 ADR 0009 淺色玻璃設計系統與 `lucide-react`**，確保跨頁面視覺與圖標一致性。
