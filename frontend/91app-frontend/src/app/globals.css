@@ -21,7 +21,6 @@ body {
   margin: 0;
   /* ADR 0009：柔和淡藍紫漸層背景 */
   background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
-  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
 }

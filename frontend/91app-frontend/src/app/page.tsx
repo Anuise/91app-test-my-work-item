@@ -49,7 +49,7 @@ export default function Home() {
               登入後即可查看你的工作項目；每個人的確認狀態獨立保存，不會彼此影響。
             </p>
           </div>
-          <p className="text-xs tracking-wide text-slate-400">SECURE ACCESS · PERSONAL PROGRESS</p>
+          <p className="text-xs tracking-wide text-slate-500">SECURE ACCESS · PERSONAL PROGRESS</p>
         </section>
 
         <section className="flex min-h-[620px] items-center p-6 sm:p-10 lg:p-12">
