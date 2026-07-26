@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AUTH_COOKIE_NAME, BACKEND_API_URL } from "@/lib/server-auth";
+import WorkItemsList from "./WorkItemsList";
 
 export default async function WorkItemsPage() {
   const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
@@ -26,9 +27,9 @@ export default async function WorkItemsPage() {
         <div className="mt-14 rounded-2xl border border-white/50 bg-white/75 p-8 shadow-xl shadow-blue-900/5 backdrop-blur-md sm:p-12">
           <p className="text-sm font-medium text-blue-600">登入狀態有效</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">我的工作項目</h1>
-          <p className="mt-4 max-w-xl leading-7 text-slate-600">
-            身份驗證骨架已就緒。工作項目列表會在後續功能中加入。
-          </p>
+          <div className="mt-8">
+            <WorkItemsList />
+          </div>
         </div>
       </section>
     </main>

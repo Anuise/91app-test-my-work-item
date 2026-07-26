@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using _91app_backend;
 using _91app_backend.Data;
 using _91app_backend.Models;
@@ -25,6 +26,9 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
             "請求資料格式不正確",
             ["請確認 JSON 格式與欄位型別"],
             context.HttpContext.TraceIdentifier));
+}).AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("缺少 PostgreSQL 連線字串");
@@ -33,6 +37,8 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
+builder.Services.AddScoped<IWorkItemService, WorkItemService>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("缺少 JWT 設定");
