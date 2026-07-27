@@ -224,6 +224,110 @@ describe("WorkItemsList", () => {
     expect(screen.getByRole("button", { name: /確認所選項目（2）/ })).toBeEnabled();
   });
 
+  test("勾選某列後該列顯示已選中的視覺回饋", async () => {
+    stubFetchReturning([
+      { id: "wi-1", title: "設定開發環境", status: "Pending", createdAt: "2026-07-26T01:00:00Z" },
+      { id: "wi-2", title: "撰寫測試", status: "Pending", createdAt: "2026-07-26T02:00:00Z" },
+    ]);
+    const user = userEvent.setup();
+
+    render(<WorkItemsList />);
+    await screen.findByText("設定開發環境");
+
+    // 第一個 row 是表頭，資料列依序在後。
+    const [, firstRow, secondRow] = screen.getAllByRole("row");
+    expect(firstRow).toHaveAttribute("aria-selected", "false");
+
+    await user.click(screen.getByRole("checkbox", { name: "選取 設定開發環境" }));
+
+    expect(firstRow).toHaveAttribute("aria-selected", "true");
+    expect(secondRow).toHaveAttribute("aria-selected", "false");
+  });
+
+  test("全選限當前頁：確認只送出當前頁被勾選的明確 ID 清單", async () => {
+    // ADR 0015：全選僅作用於當前頁，翻頁後不得累積前一頁的選取。
+    const itemsByPage: Record<string, unknown[]> = {
+      "1": [
+        { id: "wi-1", title: "項目 1", status: "Pending", createdAt: "2026-07-26T01:00:00Z" },
+        { id: "wi-2", title: "項目 2", status: "Pending", createdAt: "2026-07-26T02:00:00Z" },
+      ],
+      "2": [{ id: "wi-3", title: "項目 3", status: "Pending", createdAt: "2026-07-26T03:00:00Z" }],
+    };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void init;
+      if (url.startsWith("/api/work-items/bulk-confirm")) {
+        return jsonResponse({
+          success: true,
+          data: { confirmedCount: 1, ignoredCount: 0 },
+          message: "成功確認 1 個項目",
+        });
+      }
+      const page = new URL(url, "http://localhost").searchParams.get("page") ?? "1";
+      // totalCount 需大於 PAGE_SIZE 才會渲染出可用的下一頁按鈕。
+      return jsonResponse(pagedBody(itemsByPage[page], 21));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<WorkItemsList />);
+    await screen.findByText("項目 1");
+
+    await user.click(screen.getByRole("checkbox", { name: "全選目前項目" }));
+    await user.click(screen.getByRole("button", { name: /下一頁/ }));
+    await screen.findByText("項目 3");
+
+    await user.click(screen.getByRole("checkbox", { name: "全選目前項目" }));
+    await user.click(screen.getByRole("button", { name: /確認所選項目/ }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/work-items/bulk-confirm")),
+      ).toBe(true);
+    });
+    const confirmCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).startsWith("/api/work-items/bulk-confirm"),
+    );
+    expect(JSON.parse(String(confirmCall?.[1]?.body))).toEqual({ workItemIds: ["wi-3"] });
+  });
+
+  test("重整後我的已確認狀態仍在，且 checkbox 為未勾選", async () => {
+    let confirmed = false;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("/api/work-items/bulk-confirm")) {
+        confirmed = true;
+        return jsonResponse({
+          success: true,
+          data: { confirmedCount: 1, ignoredCount: 0 },
+          message: "成功確認 1 個項目",
+        });
+      }
+      return jsonResponse(pagedBody([
+        {
+          id: "wi-1",
+          title: "設定開發環境",
+          status: confirmed ? "Confirmed" : "Pending",
+          createdAt: "2026-07-26T01:00:00Z",
+        },
+      ]));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    const { unmount } = render(<WorkItemsList />);
+    await screen.findByText("設定開發環境");
+    await user.click(screen.getByRole("checkbox", { name: "選取 設定開發環境" }));
+    await user.click(screen.getByRole("button", { name: /確認所選項目/ }));
+    await screen.findByText("成功確認 1 個項目");
+
+    // 重整等同重新掛載並重新查詢：狀態由後端持久化，選取狀態不持久化。
+    unmount();
+    render(<WorkItemsList />);
+    await screen.findByText("設定開發環境");
+
+    expect(screen.getByRole("cell", { name: "已確認" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "選取 設定開發環境" })).not.toBeChecked();
+  });
+
   test("成功批量確認後回饋數量並清除選取", async () => {
     let confirmed = false;
     const fetchMock = vi.fn(async (url: string) => {
@@ -285,7 +389,7 @@ describe("WorkItemsList", () => {
     expect(screen.getByRole("button", { name: /確認所選項目/ })).toBeEnabled();
   });
 
-  test("只有 Confirmed 項目顯示撤銷按鈕", async () => {
+  test("只有 Confirmed 項目顯示撤銷確認按鈕", async () => {
     stubFetchReturning([
       { id: "wi-1", title: "設定開發環境", status: "Pending", createdAt: "2026-07-26T01:00:00Z" },
       { id: "wi-2", title: "撰寫測試", status: "Confirmed", createdAt: "2026-07-26T02:00:00Z" },
@@ -294,8 +398,8 @@ describe("WorkItemsList", () => {
     render(<WorkItemsList />);
     await screen.findByText("設定開發環境");
 
-    expect(screen.getByRole("button", { name: "撤銷 撰寫測試" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "撤銷 設定開發環境" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "撤銷確認 撰寫測試" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "撤銷確認 設定開發環境" })).not.toBeInTheDocument();
   });
 
   test("點擊撤銷開啟確認對話框，取消則關閉且不發送請求", async () => {
@@ -307,7 +411,7 @@ describe("WorkItemsList", () => {
     render(<WorkItemsList />);
     await screen.findByText("撰寫測試");
 
-    await user.click(screen.getByRole("button", { name: "撤銷 撰寫測試" }));
+    await user.click(screen.getByRole("button", { name: "撤銷確認 撰寫測試" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "取消" }));
@@ -345,14 +449,14 @@ describe("WorkItemsList", () => {
     render(<WorkItemsList />);
     await screen.findByText("撰寫測試");
 
-    await user.click(screen.getByRole("button", { name: "撤銷 撰寫測試" }));
+    await user.click(screen.getByRole("button", { name: "撤銷確認 撰寫測試" }));
     await user.click(screen.getByRole("button", { name: "確認撤銷" }));
 
     expect(await screen.findByText("已撤銷確認，狀態恢復為待確認")).toBeInTheDocument();
     // 列表反映恢復為待確認，且撤銷按鈕消失。
     expect(await screen.findByRole("cell", { name: "待確認" })).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "撤銷 撰寫測試" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "撤銷確認 撰寫測試" })).not.toBeInTheDocument();
     });
   });
 
@@ -374,13 +478,13 @@ describe("WorkItemsList", () => {
     render(<WorkItemsList />);
     await screen.findByText("撰寫測試");
 
-    await user.click(screen.getByRole("button", { name: "撤銷 撰寫測試" }));
+    await user.click(screen.getByRole("button", { name: "撤銷確認 撰寫測試" }));
     await user.click(screen.getByRole("button", { name: "確認撤銷" }));
 
     expect(await screen.findByText("撤銷失敗，請稍後再試")).toBeInTheDocument();
     // 保留 Confirmed 狀態，撤銷按鈕仍在可重試。
     expect(screen.getByRole("cell", { name: "已確認" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "撤銷 撰寫測試" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "撤銷確認 撰寫測試" })).toBeInTheDocument();
   });
 
   test("依 URL 查詢脈絡還原列表並於詳情連結帶入脈絡", async () => {
