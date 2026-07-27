@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ApiError, authedFetch } from "../../../../../lib/api-client";
 
 type EditWorkItemFormProps = {
   id: string;
@@ -29,27 +30,19 @@ export function EditWorkItemForm({
 
     setError("");
     setIsSubmitting(true);
-    const response = await fetch(`/api/admin/work-items/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: title.trim(),
-        description: description.trim() || null,
-      }),
-    });
-    const payload = await response.json() as {
-      success: boolean;
-      message: string;
-      errors?: string[];
-    };
-
-    if (response.ok && payload.success) {
+    try {
+      await authedFetch(`/api/admin/work-items/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+        }),
+      });
       router.push("/admin/work-items?updated=1");
-      return;
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.errors[0] ?? reason.message : "更新工作項目失敗");
+      setIsSubmitting(false);
     }
-
-    setError(payload.errors?.[0] ?? payload.message ?? "更新工作項目失敗");
-    setIsSubmitting(false);
   }
 
   return (

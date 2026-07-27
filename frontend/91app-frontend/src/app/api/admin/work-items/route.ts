@@ -1,6 +1,5 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME, BACKEND_API_URL } from "@/lib/server-auth";
+import { BACKEND_API_URL, getBearerToken } from "@/lib/server-auth";
 
 function unauthorizedResponse() {
   return NextResponse.json({
@@ -11,8 +10,8 @@ function unauthorizedResponse() {
   }, { status: 401 });
 }
 
-export async function GET() {
-  const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+export async function GET(request: Request) {
+  const accessToken = getBearerToken(request);
   if (!accessToken) {
     return unauthorizedResponse();
   }
@@ -25,7 +24,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+  const accessToken = getBearerToken(request);
   if (!accessToken) {
     return unauthorizedResponse();
   }

@@ -60,7 +60,6 @@ services:
         NEXT_PUBLIC_PASSWORD_SALT: ${NEXT_PUBLIC_PASSWORD_SALT:-MyWorkItem-System-Salt-v1}
     environment:
       API_BASE_URL: ${API_BASE_URL:-http://backend:8080}
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:

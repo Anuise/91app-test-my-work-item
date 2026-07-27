@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { fetchWorkItem } from "@/lib/work-items";
@@ -21,7 +20,7 @@ function formatDateTime(value: string) {
   return new Date(value).toLocaleString("zh-TW", { hour12: false });
 }
 
-function WorkItemDetailInner({ id, backHref }: { id: string; backHref: string }) {
+export default function WorkItemDetailView({ id, backHref }: { id: string; backHref: string }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["work-item", id],
     queryFn: () => fetchWorkItem(id),
@@ -83,15 +82,5 @@ function WorkItemDetailInner({ id, backHref }: { id: string; backHref: string })
         ) : null}
       </div>
     </div>
-  );
-}
-
-export default function WorkItemDetailView({ id, backHref }: { id: string; backHref: string }) {
-  const [queryClient] = useState(() => new QueryClient());
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <WorkItemDetailInner id={id} backHref={backHref} />
-    </QueryClientProvider>
   );
 }

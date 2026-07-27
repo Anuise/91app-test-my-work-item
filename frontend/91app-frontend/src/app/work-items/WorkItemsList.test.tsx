@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import { renderWithProviders as render } from "@/test-utils";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import WorkItemsList from "./WorkItemsList";
@@ -70,12 +71,12 @@ describe("WorkItemsList", () => {
 
     render(<WorkItemsList />);
     await screen.findByText("目前沒有任何工作項目");
-    expect(fetchMock).toHaveBeenCalledWith("/api/work-items?sortOrder=desc");
+    expect(fetchMock).toHaveBeenCalledWith("/api/work-items?sortOrder=desc", expect.anything());
 
     await user.click(screen.getByRole("button", { name: /建立時間/ }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/work-items?sortOrder=asc");
+      expect(fetchMock).toHaveBeenCalledWith("/api/work-items?sortOrder=asc", expect.anything());
     });
   });
 
@@ -290,7 +291,7 @@ describe("WorkItemsList", () => {
     await screen.findByText("設定開發環境");
 
     // 由 URL 還原為升冪查詢。
-    expect(fetchMock).toHaveBeenCalledWith("/api/work-items?sortOrder=asc");
+    expect(fetchMock).toHaveBeenCalledWith("/api/work-items?sortOrder=asc", expect.anything());
     // 詳情連結帶入目前排序脈絡，返回列表時即可還原。
     expect(screen.getByRole("link", { name: "設定開發環境" })).toHaveAttribute(
       "href",

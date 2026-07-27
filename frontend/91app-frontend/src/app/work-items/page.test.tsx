@@ -1,87 +1,73 @@
-import { render, screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import WorkItemsPage from "./page";
+import { renderWithProviders, signIn } from "@/test-utils";
 
-const { getCookie, redirect } = vi.hoisted(() => ({
-  getCookie: vi.fn(),
-  redirect: vi.fn(),
-}));
+const state = vi.hoisted(() => ({ search: "" }));
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
 
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: getCookie }),
-}));
-
-// 頁面內嵌的 WorkItemsList 會使用 router/pathname/searchParams 還原列表脈絡，需一併模擬。
+// 頁面與內嵌的 WorkItemsList 都依賴 router/pathname/searchParams，需一併模擬。
 vi.mock("next/navigation", () => ({
-  redirect,
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace, push: vi.fn() }),
   usePathname: () => "/work-items",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(state.search),
 }));
 
-describe("工作項目登入狀態", () => {
+describe("工作項目受保護頁面", () => {
   beforeEach(() => {
-    getCookie.mockReturnValue({ value: "signed-jwt" });
-    redirect.mockReset();
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-      if (url.includes("/auth/session")) {
-        return new Response(JSON.stringify({
-          success: true,
-          data: { id: "user-id", name: "User", role: "User" },
-          message: "登入狀態有效",
-        }), { status: 200, headers: { "Content-Type": "application/json" } });
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        data: [],
-        message: "取得工作項目列表成功",
-      }), { status: 200, headers: { "Content-Type": "application/json" } });
-    }));
+    state.search = "";
+    replace.mockReset();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: [],
+      message: "取得工作項目列表成功",
+    }), { status: 200 })));
   });
 
-  test("重新整理後由伺服器驗證 HttpOnly session", async () => {
-    render(await WorkItemsPage());
+  test("未登入時導回登入頁，不渲染列表殼層", async () => {
+    renderWithProviders(<WorkItemsPage />);
 
-    expect(screen.getByRole("heading", { name: "我的工作項目" })).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:5206/api/v1/auth/session",
-      {
-        cache: "no-store",
-        headers: { Authorization: "Bearer signed-jwt" },
-      },
-    );
-    expect(redirect).not.toHaveBeenCalled();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByRole("heading", { name: "我的工作項目" })).not.toBeInTheDocument();
+  });
+
+  test("已登入使用者停留在受保護殼層", async () => {
+    signIn("User");
+
+    renderWithProviders(<WorkItemsPage />);
+
+    expect(await screen.findByRole("heading", { name: "我的工作項目" })).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   test("Admin 看得到後台管理入口", async () => {
-    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
-      if (String(url).includes("/auth/session")) {
-        return new Response(JSON.stringify({
-          success: true,
-          data: { id: "admin-id", name: "Admin", role: "Admin" },
-          message: "登入狀態有效",
-        }), { status: 200, headers: { "Content-Type": "application/json" } });
-      }
+    signIn("Admin");
 
-      return new Response(JSON.stringify({ success: true, data: [], message: "取得工作項目列表成功" }));
-    });
+    renderWithProviders(<WorkItemsPage />);
 
-    render(await WorkItemsPage());
-
-    expect(screen.getByRole("link", { name: "後台管理" })).toHaveAttribute("href", "/admin/work-items");
+    expect(await screen.findByRole("link", { name: "後台管理" })).toHaveAttribute(
+      "href",
+      "/admin/work-items",
+    );
   });
 
   test("一般 User 看不到後台管理入口", async () => {
-    render(await WorkItemsPage());
+    signIn("User");
 
+    renderWithProviders(<WorkItemsPage />);
+
+    expect(await screen.findByRole("heading", { name: "我的工作項目" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "後台管理" })).not.toBeInTheDocument();
   });
 
   test("權限不足導回列表時顯示 Toast 回饋", async () => {
-    render(await WorkItemsPage({ searchParams: Promise.resolve({ notice: "forbidden" }) }));
+    signIn("User");
+    state.search = "notice=forbidden";
 
-    expect(screen.getByRole("alert")).toHaveTextContent("權限不足，無法進入後台管理");
-    expect(screen.getByRole("alert")).toHaveClass("fixed");
+    renderWithProviders(<WorkItemsPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("權限不足，無法進入後台管理");
+    expect(alert).toHaveClass("fixed");
   });
 });

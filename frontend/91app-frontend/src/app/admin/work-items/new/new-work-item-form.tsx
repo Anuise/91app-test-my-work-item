@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ApiError, authedFetch } from "@/lib/api-client";
 
 export default function NewWorkItemForm() {
   const router = useRouter();
@@ -19,27 +20,19 @@ export default function NewWorkItemForm() {
 
     setError("");
     setIsSubmitting(true);
-    const response = await fetch("/api/admin/work-items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: title.trim(),
-        description: description.trim() || null,
-      }),
-    });
-    const payload = await response.json() as {
-      success: boolean;
-      message: string;
-      errors?: string[];
-    };
-
-    if (response.ok && payload.success) {
+    try {
+      await authedFetch("/api/admin/work-items", {
+        method: "POST",
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+        }),
+      });
       router.push("/admin/work-items?created=1");
-      return;
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.errors[0] ?? reason.message : "建立工作項目失敗");
+      setIsSubmitting(false);
     }
-
-    setError(payload.errors?.[0] ?? payload.message ?? "建立工作項目失敗");
-    setIsSubmitting(false);
   }
 
   return (

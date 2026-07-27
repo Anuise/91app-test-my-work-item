@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, CheckCheck, Inbox, RotateCcw } from "lucide-react";
@@ -30,7 +24,7 @@ const STATUS_STYLES = {
   Confirmed: "text-[#059669] bg-[rgba(209,250,229,0.8)]",
 } as const;
 
-function WorkItemsListInner() {
+export default function WorkItemsList() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -275,15 +269,5 @@ function WorkItemsListInner() {
         </div>
       ) : null}
     </div>
-  );
-}
-
-export default function WorkItemsList() {
-  const [queryClient] = useState(() => new QueryClient());
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <WorkItemsListInner />
-    </QueryClientProvider>
   );
 }

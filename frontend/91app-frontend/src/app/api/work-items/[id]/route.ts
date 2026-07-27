@@ -1,12 +1,11 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME, BACKEND_API_URL } from "@/lib/server-auth";
+import { BACKEND_API_URL, getBearerToken } from "@/lib/server-auth";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+  const accessToken = getBearerToken(request);
   if (!accessToken) {
     return NextResponse.json(
       {

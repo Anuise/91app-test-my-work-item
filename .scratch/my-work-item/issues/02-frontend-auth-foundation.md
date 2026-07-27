@@ -4,11 +4,11 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] token 儲存與攜帶全站統一為 localStorage + `Authorization: Bearer <token>`（ADR 0010 補註 B）；移除或改寫 cookie 讀取路徑使全站一致
-- [ ] 建立帶 token 的 authed fetch 封裝，統一解讀 API envelope 與錯誤（含 traceId）
-- [ ] 設定 TanStack Query provider（ADR 0002）
-- [ ] 路由守衛：未登入存取 `/work-items`／`/admin/*` 導回登入頁；已登入但非 Admin 存取 `/admin/*` 被擋（前端依 Claims，後端仍以 401/403 為準）
-- [ ] 登入成功後可導向並停留在受保護殼層
-- [ ] 前端測試（Testing Library + mock fetch）：未授權導回、Admin 守衛、authed fetch 帶上 Bearer
+- [x] token 儲存與攜帶全站統一為 localStorage + `Authorization: Bearer <token>`（ADR 0010 補註 B）；移除或改寫 cookie 讀取路徑使全站一致
+- [x] 建立帶 token 的 authed fetch 封裝，統一解讀 API envelope 與錯誤（含 traceId）
+- [x] 設定 TanStack Query provider（ADR 0002）
+- [x] 路由守衛：未登入存取 `/work-items`／`/admin/*` 導回登入頁；已登入但非 Admin 存取 `/admin/*` 被擋（前端依 Claims，後端仍以 401/403 為準）
+- [x] 登入成功後可導向並停留在受保護殼層
+- [x] 前端測試（Testing Library + mock fetch）：未授權導回、Admin 守衛、authed fetch 帶上 Bearer

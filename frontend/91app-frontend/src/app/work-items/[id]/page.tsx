@@ -1,39 +1,16 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { AUTH_COOKIE_NAME, BACKEND_API_URL } from "@/lib/server-auth";
+"use client";
+
+import { useParams, useSearchParams } from "next/navigation";
+import AuthGuard from "@/components/auth-guard";
 import WorkItemDetailView from "./WorkItemDetailView";
 
-export default async function WorkItemDetailPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
-  if (!accessToken) {
-    redirect("/");
-  }
-
-  const response = await fetch(`${BACKEND_API_URL}/api/v1/auth/session`, {
-    cache: "no-store",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!response.ok) {
-    redirect("/");
-  }
-
-  const { id } = await params;
-  const query = await searchParams;
+function WorkItemDetailPageContent() {
+  const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
 
   // 保留列表脈絡：原樣帶回列表的查詢字串（目前為排序方向，未來擴充分頁亦可沿用）。
-  const listQuery = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (typeof value === "string") {
-      listQuery.set(key, value);
-    }
-  }
-  const backHref = listQuery.size > 0 ? `/work-items?${listQuery.toString()}` : "/work-items";
+  const listQuery = searchParams.toString();
+  const backHref = listQuery.length > 0 ? `/work-items?${listQuery}` : "/work-items";
 
   return (
     <main className="min-h-screen px-5 py-8 text-slate-900 sm:px-8">
@@ -50,5 +27,13 @@ export default async function WorkItemDetailPage({
         </div>
       </section>
     </main>
+  );
+}
+
+export default function WorkItemDetailPage() {
+  return (
+    <AuthGuard>
+      <WorkItemDetailPageContent />
+    </AuthGuard>
   );
 }

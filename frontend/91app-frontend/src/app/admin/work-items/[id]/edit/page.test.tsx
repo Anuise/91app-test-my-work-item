@@ -1,20 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import EditWorkItemPage from "./page";
+import { renderWithProviders, signIn } from "@/test-utils";
 
-const getCookie = vi.fn();
-
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: getCookie }),
-}));
+const state = vi.hoisted(() => ({ id: "work-item-id" }));
 
 vi.mock("next/navigation", () => ({
+  useParams: () => ({ id: state.id }),
   useRouter: () => ({ push: vi.fn() }),
 }));
 
 describe("編輯工作項目頁面", () => {
   beforeEach(() => {
-    getCookie.mockReturnValue({ value: "admin-jwt" });
+    state.id = "work-item-id";
+    signIn("Admin");
   });
 
   test("載入既有項目時顯示預填標題與描述", async () => {
@@ -29,18 +28,18 @@ describe("編輯工作項目頁面", () => {
       message: "取得工作項目成功",
     }), { status: 200 })));
 
-    render(await EditWorkItemPage({ params: Promise.resolve({ id: "work-item-id" }) }));
+    renderWithProviders(<EditWorkItemPage />);
 
     expect(screen.getByRole("heading", { name: "編輯工作項目" })).toBeInTheDocument();
-    expect(screen.getByLabelText("標題")).toHaveValue("既有標題");
+    expect(await screen.findByLabelText("標題")).toHaveValue("既有標題");
     expect(screen.getByLabelText("描述（選填）")).toHaveValue("既有描述");
-    expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:5206/api/v1/admin/work-items/work-item-id",
-      expect.objectContaining({ headers: { Authorization: "Bearer admin-jwt" } }),
-    );
+    const [path, init] = vi.mocked(fetch).mock.calls[0];
+    expect(path).toBe("/api/admin/work-items/work-item-id");
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer admin-jwt");
   });
 
   test("項目不存在時顯示錯誤且不渲染儲存表單", async () => {
+    state.id = "missing";
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       success: false,
       data: null,
@@ -49,9 +48,9 @@ describe("編輯工作項目頁面", () => {
       traceId: "trace-404",
     }), { status: 404 })));
 
-    render(await EditWorkItemPage({ params: Promise.resolve({ id: "missing" }) }));
+    renderWithProviders(<EditWorkItemPage />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("找不到工作項目");
+    expect(await screen.findByRole("alert")).toHaveTextContent("找不到工作項目");
     expect(screen.queryByRole("button", { name: "儲存變更" })).not.toBeInTheDocument();
   });
 });
