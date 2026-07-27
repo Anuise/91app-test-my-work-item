@@ -1,4 +1,8 @@
-```markdown
+---
+name: 91app-test-my-work-item
+description: Development conventions and workflows for the 91app-test-my-work-item repository. Use when modifying code, tests, documentation, or commits in this repository.
+---
+
 # 91app-test-my-work-item Development Patterns
 
 > Auto-generated skill from repository analysis
@@ -73,5 +77,3 @@ This skill outlines the development conventions and workflows for the `91app-tes
 | Command       | Purpose                                 |
 |---------------|-----------------------------------------|
 | /update-docs  | Standardize documentation update workflow |
-
-```
