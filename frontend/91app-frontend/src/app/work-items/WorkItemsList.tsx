@@ -8,8 +8,14 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { ArrowDownNarrowWide, ArrowUpNarrowWide, CheckCheck, Inbox } from "lucide-react";
-import { bulkConfirmWorkItems, fetchWorkItems, type SortOrder } from "@/lib/work-items";
+import { ArrowDownNarrowWide, ArrowUpNarrowWide, CheckCheck, Inbox, RotateCcw } from "lucide-react";
+import {
+  bulkConfirmWorkItems,
+  fetchWorkItems,
+  revokeWorkItem,
+  type SortOrder,
+  type WorkItemListItem,
+} from "@/lib/work-items";
 
 const STATUS_LABELS = {
   Pending: "待確認",
@@ -27,6 +33,8 @@ function WorkItemsListInner() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // 待撤銷的項目；非 null 時顯示確認對話框，於實際變更前先取得使用者確認。
+  const [revokeTarget, setRevokeTarget] = useState<WorkItemListItem | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["work-items", { sortOrder }],
@@ -44,6 +52,21 @@ function WorkItemsListInner() {
     onError: () => {
       // 失敗時保留選取狀態，讓使用者可直接重試。
       setFeedback({ type: "error", text: "批量確認失敗，請稍後再試" });
+    },
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (id: string) => revokeWorkItem(id),
+    onSuccess: (result) => {
+      // 成功後關閉對話框、回饋結果，並重新取得列表以反映恢復為 Pending 的狀態。
+      setRevokeTarget(null);
+      setFeedback({ type: "success", text: result.message });
+      queryClient.invalidateQueries({ queryKey: ["work-items"] });
+    },
+    onError: () => {
+      // 失敗時關閉對話框並保留原 Confirmed 狀態（未做樂觀更新），顯示可理解錯誤供重試。
+      setRevokeTarget(null);
+      setFeedback({ type: "error", text: "撤銷失敗，請稍後再試" });
     },
   });
 
@@ -138,6 +161,7 @@ function WorkItemsListInner() {
                   <th className="px-4 py-3 font-medium">識別碼</th>
                   <th className="px-4 py-3 font-medium">標題</th>
                   <th className="px-4 py-3 font-medium">狀態</th>
+                  <th className="px-4 py-3 font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +183,19 @@ function WorkItemsListInner() {
                         {STATUS_LABELS[item.status]}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      {item.status === "Confirmed" ? (
+                        <button
+                          type="button"
+                          aria-label={`撤銷 ${item.title}`}
+                          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white/70 px-3 text-sm font-medium text-slate-700 transition duration-200 ease-in-out hover:border-red-300 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-blue-500"
+                          onClick={() => setRevokeTarget(item)}
+                        >
+                          <RotateCcw className="size-4" aria-hidden="true" />
+                          撤銷
+                        </button>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -171,6 +208,42 @@ function WorkItemsListInner() {
           </div>
         )}
       </div>
+
+      {revokeTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revoke-dialog-title"
+            className="w-full max-w-md rounded-2xl border border-white/50 bg-white/90 p-6 shadow-xl backdrop-blur-md"
+          >
+            <h3 id="revoke-dialog-title" className="text-lg font-semibold text-slate-900">
+              撤銷確認
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              確定要撤銷「{revokeTarget.title}」的確認嗎？狀態將恢復為待確認。
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-slate-200 bg-white/70 px-4 text-sm font-medium text-slate-700 transition duration-200 ease-in-out hover:border-blue-300 hover:text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={revokeMutation.isPending}
+                onClick={() => setRevokeTarget(null)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-10 cursor-pointer items-center rounded-xl bg-red-600 px-4 text-sm font-medium text-white transition duration-200 ease-in-out hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={revokeMutation.isPending}
+                onClick={() => revokeMutation.mutate(revokeTarget.id)}
+              >
+                確認撤銷
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

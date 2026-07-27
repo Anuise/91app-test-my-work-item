@@ -93,4 +93,29 @@ public sealed class WorkItemsController(IWorkItemService workItemService) : Cont
             : $"成功確認 {result.ConfirmedCount} 個項目";
         return Ok(ApiResponse<BulkConfirmResult>.Ok(result, message));
     }
+
+    [HttpPost("{id:guid}/revoke")]
+    [ProducesResponseType<ApiResponse<RevokeResult>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Revoke(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var subject = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (!Guid.TryParse(subject, out var userId))
+        {
+            return Unauthorized(ApiResponse<object>.Fail(
+                "登入狀態無效",
+                ["Token identity claims are incomplete"],
+                HttpContext.TraceIdentifier));
+        }
+
+        var result = await workItemService.RevokeAsync(userId, id, cancellationToken);
+
+        // 依 ADR 0013 優雅降級：無法撤銷（已刪除或非 Confirmed）時仍以 HTTP 200 回應並於訊息說明。
+        var message = result.Revoked
+            ? "已撤銷確認，狀態恢復為待確認"
+            : "此項目目前非已確認狀態，無需撤銷";
+        return Ok(ApiResponse<RevokeResult>.Ok(result, message));
+    }
 }

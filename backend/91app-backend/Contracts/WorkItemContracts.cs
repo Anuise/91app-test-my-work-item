@@ -17,3 +17,5 @@ public sealed record WorkItemListItem(
 public sealed record BulkConfirmRequest(IReadOnlyList<Guid> WorkItemIds);
 
 public sealed record BulkConfirmResult(int ConfirmedCount, int IgnoredCount);
+
+public sealed record RevokeResult(bool Revoked);

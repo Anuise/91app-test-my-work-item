@@ -14,4 +14,10 @@ public interface IWorkItemRepository
         Guid userId,
         IReadOnlyCollection<Guid> workItemIds,
         CancellationToken cancellationToken);
+
+    // 將指定使用者對單筆 Work Item 的狀態由 Confirmed 撤銷回 Pending，回傳是否確實發生變更（僅 Confirmed 可撤銷）。
+    Task<bool> RevokeForUserAsync(
+        Guid userId,
+        Guid workItemId,
+        CancellationToken cancellationToken);
 }

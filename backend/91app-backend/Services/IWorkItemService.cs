@@ -13,4 +13,9 @@ public interface IWorkItemService
         Guid userId,
         IReadOnlyList<Guid> workItemIds,
         CancellationToken cancellationToken);
+
+    Task<RevokeResult> RevokeAsync(
+        Guid userId,
+        Guid workItemId,
+        CancellationToken cancellationToken);
 }

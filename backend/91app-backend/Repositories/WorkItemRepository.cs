@@ -86,4 +86,35 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
         await context.SaveChangesAsync(cancellationToken);
         return existingIds.Count;
     }
+
+    public async Task<bool> RevokeForUserAsync(
+        Guid userId,
+        Guid workItemId,
+        CancellationToken cancellationToken)
+    {
+        // 僅撤銷仍存在（未軟刪除）的 Work Item；已刪除者透過 Global Query Filter 自動排除（ADR 0013）。
+        var exists = await context.WorkItems
+            .AnyAsync(item => item.Id == workItemId, cancellationToken);
+        if (!exists)
+        {
+            return false;
+        }
+
+        var status = await context.UserWorkItemStatuses
+            .FirstOrDefaultAsync(
+                item => item.UserId == userId && item.WorkItemId == workItemId,
+                cancellationToken);
+
+        // 服務轉換規則：僅 Confirmed 可撤銷回 Pending；隱式 Pending（無紀錄）或已是 Pending 皆視為無需變更（冪等）。
+        if (status is null || status.Status != WorkItemStatus.Confirmed)
+        {
+            return false;
+        }
+
+        status.Status = WorkItemStatus.Pending;
+        status.ConfirmedAt = null;
+        status.UpdatedAt = DateTimeOffset.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

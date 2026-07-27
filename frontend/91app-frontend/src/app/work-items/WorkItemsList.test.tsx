@@ -153,4 +153,110 @@ describe("WorkItemsList", () => {
     // 保留選取狀態，按鈕仍為 enabled 可重試。
     expect(screen.getByRole("button", { name: /確認所選項目/ })).toBeEnabled();
   });
+
+  test("只有 Confirmed 項目顯示撤銷按鈕", async () => {
+    stubFetchReturning([
+      { id: "wi-1", title: "設定開發環境", status: "Pending", createdAt: "2026-07-26T01:00:00Z" },
+      { id: "wi-2", title: "撰寫測試", status: "Confirmed", createdAt: "2026-07-26T02:00:00Z" },
+    ]);
+
+    render(<WorkItemsList />);
+    await screen.findByText("設定開發環境");
+
+    expect(screen.getByRole("button", { name: "撤銷 撰寫測試" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "撤銷 設定開發環境" })).not.toBeInTheDocument();
+  });
+
+  test("點擊撤銷開啟確認對話框，取消則關閉且不發送請求", async () => {
+    const fetchMock = stubFetchReturning([
+      { id: "wi-2", title: "撰寫測試", status: "Confirmed", createdAt: "2026-07-26T02:00:00Z" },
+    ]);
+    const user = userEvent.setup();
+
+    render(<WorkItemsList />);
+    await screen.findByText("撰寫測試");
+
+    await user.click(screen.getByRole("button", { name: "撤銷 撰寫測試" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "取消" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    // 取消不得送出任何撤銷請求。
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/revoke"))).toBe(false);
+  });
+
+  test("確認撤銷成功後列表反映 Pending 並顯示成功回饋", async () => {
+    let revoked = false;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/revoke")) {
+        revoked = true;
+        return jsonResponse({
+          success: true,
+          data: { revoked: true },
+          message: "已撤銷確認，狀態恢復為待確認",
+        });
+      }
+      return jsonResponse({
+        success: true,
+        data: [
+          {
+            id: "wi-2",
+            title: "撰寫測試",
+            status: revoked ? "Pending" : "Confirmed",
+            createdAt: "2026-07-26T02:00:00Z",
+          },
+        ],
+        message: "取得工作項目列表成功",
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<WorkItemsList />);
+    await screen.findByText("撰寫測試");
+
+    await user.click(screen.getByRole("button", { name: "撤銷 撰寫測試" }));
+    await user.click(screen.getByRole("button", { name: "確認撤銷" }));
+
+    expect(await screen.findByText("已撤銷確認，狀態恢復為待確認")).toBeInTheDocument();
+    // 列表反映恢復為待確認，且撤銷按鈕消失。
+    expect(await screen.findByText("待確認")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "撤銷 撰寫測試" })).not.toBeInTheDocument();
+    });
+  });
+
+  test("撤銷失敗時顯示錯誤並保留 Confirmed", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/revoke")) {
+        return jsonResponse(
+          { success: false, data: null, message: "fail", errors: ["x"] },
+          500,
+        );
+      }
+      return jsonResponse({
+        success: true,
+        data: [
+          { id: "wi-2", title: "撰寫測試", status: "Confirmed", createdAt: "2026-07-26T02:00:00Z" },
+        ],
+        message: "取得工作項目列表成功",
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<WorkItemsList />);
+    await screen.findByText("撰寫測試");
+
+    await user.click(screen.getByRole("button", { name: "撤銷 撰寫測試" }));
+    await user.click(screen.getByRole("button", { name: "確認撤銷" }));
+
+    expect(await screen.findByText("撤銷失敗，請稍後再試")).toBeInTheDocument();
+    // 保留 Confirmed 狀態，撤銷按鈕仍在可重試。
+    expect(screen.getByText("已確認")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "撤銷 撰寫測試" })).toBeInTheDocument();
+  });
 });
