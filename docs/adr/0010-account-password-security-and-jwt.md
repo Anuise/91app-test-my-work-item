@@ -31,3 +31,20 @@
 
 ### 缺點 / 考量
 - 前端與後端需共享 `SystemSalt` 常數設定。
+
+## 補註 (Addendum)
+
+- **日期**：2026-07-27
+- **來源**：設計 grill 定案。
+
+### 補註 A：前端預雜湊的安全定位（澄清，非傳輸安全）
+
+- 固定 `SystemSalt` 的 `ClientHash` 為**確定性、可重放**值；TLS 已負責傳輸機密性，預雜湊**不**額外提供防嗅探效果。
+- 其唯一實質效益（窄）：**原始明文密碼永不離開瀏覽器**，即使後端誤記 request body 或遭入侵，外洩者為站內 hash，而非使用者跨站重用的原始密碼。
+- `SystemSalt` 共享對象僅為「前端登入計算」與「後端 seed 帳號」時；一般驗證流程後端不重算 `ClientHash`，直接以 `BCrypt` 比對既存 `DBStoredHash`。
+- 決策：**保留**預雜湊，但依上述定位理解，不宣稱其為傳輸/防嗅探安全。
+
+### 補註 B：JWT 前端儲存
+
+- Token 存於 **localStorage**，請求時以 `Authorization: Bearer <token>` 攜帶（貼合前後端分離）。
+- 已知取捨：localStorage 可被 XSS 讀取；靠「無第三方 script + React 預設輸出跳脫」降風險。正式環境如需升級，改走 httpOnly cookie（連帶改為 cookie 驗證模型、跨 origin CORS credentials 與 CSRF 防護），不在本 demo 範圍。
