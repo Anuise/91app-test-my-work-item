@@ -22,7 +22,64 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: 91app-backend/backend-dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-my_work_item};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      Jwt__Issuer: ${JWT_ISSUER:-MyWorkItem.Api}
+      Jwt__Audience: ${JWT_AUDIENCE:-MyWorkItem.Web}
+      Jwt__Key: ${JWT_KEY:-demo-only-jwt-signing-key-change-before-production}
+      Cors__AllowedOrigins__0: ${CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "${BACKEND_PORT:-8000}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend/91app-frontend
+      dockerfile: frontend-dockerfile
+      args:
+        NEXT_PUBLIC_PASSWORD_SALT: ${NEXT_PUBLIC_PASSWORD_SALT:-MyWorkItem-System-Salt-v1}
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://backend:8080}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - app-network
 
 volumes:
   pgdata:
     name: my-work-item-pgdata
+
+networks:
+  app-network:
+    name: my-work-item-network

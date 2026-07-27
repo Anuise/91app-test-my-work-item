@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { POST } from "./route";
 
 describe("登入 BFF", () => {
@@ -12,6 +12,10 @@ describe("登入 BFF", () => {
       },
       message: "登入成功",
     }), { status: 200, headers: { "Content-Type": "application/json" } })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   test("JWT 只寫入 HttpOnly cookie，不回傳給瀏覽器程式碼", async () => {
@@ -37,5 +41,18 @@ describe("登入 BFF", () => {
       },
       message: "登入成功",
     });
+  });
+
+  test("HTTP 展示環境可停用 Secure cookie", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_COOKIE_SECURE", "false");
+
+    const response = await POST(new Request("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "user", clientHash: "client-hash" }),
+    }));
+
+    expect(response.headers.get("set-cookie")).not.toContain("Secure");
   });
 });

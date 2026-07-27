@@ -113,6 +113,10 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/healthz", async (AppDbContext context, CancellationToken cancellationToken) =>
+    await context.Database.CanConnectAsync(cancellationToken)
+        ? Results.Ok(new { status = "Healthy" })
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
 
 await DatabaseInitializer.InitializeAsync(app.Services);
 

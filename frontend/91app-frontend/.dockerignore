@@ -1,0 +1,10 @@
+.next
+node_modules
+npm-debug.log*
+.env*
+README.md
+frontend-dockerfile
+**/*.test.ts
+**/*.test.tsx
+vitest.config.ts
+vitest.setup.ts

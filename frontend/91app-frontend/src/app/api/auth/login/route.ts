@@ -46,7 +46,9 @@ export async function POST(request: Request) {
   });
   response.cookies.set(AUTH_COOKIE_NAME, payload.data.accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.AUTH_COOKIE_SECURE === "false"
+      ? false
+      : process.env.NODE_ENV === "production",
     sameSite: "lax",
     expires: new Date(payload.data.expiresAt),
     path: "/",

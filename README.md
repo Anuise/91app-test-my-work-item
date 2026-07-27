@@ -9,6 +9,45 @@ My Work Item 是由 Next.js 16、.NET 10 Web API 與 PostgreSQL 16 組成的全�
 - Docker Desktop（含 Docker Compose）
 - Windows PowerShell 5.1 以上版本（執行資料庫 smoke script 時使用）
 
+## 一鍵展示環境
+
+從 repository root 複製展示用設定後，以單一 Compose 指令建置並啟動 PostgreSQL、.NET API 與 Next.js：
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build -d
+```
+
+服務就緒後開啟 `http://localhost:3000`，可使用下方 Demo 帳號登入。常用維運指令：
+
+```powershell
+# 查看服務與 health 狀態
+docker compose ps
+
+# 追蹤所有服務日誌
+docker compose logs -f
+
+# 停止服務並保留資料庫 volume
+docker compose down
+
+# 重新建置並啟動
+docker compose up --build -d
+```
+
+可重現的 smoke check 會建置並啟動三個服務、等待 healthcheck，並驗證 Demo 登入與重新整理後的 session：
+
+```powershell
+powershell -NoProfile -File scripts/smoke-compose.ps1
+```
+
+若 `3000` 已被本機開發服務占用，可指定替代 port：
+
+```powershell
+powershell -NoProfile -File scripts/smoke-compose.ps1 -FrontendPort 3100
+```
+
+`.env.example` 僅提供本機展示預設值；部署至正式環境前，必須覆寫 `POSTGRES_PASSWORD`、`JWT_KEY`、`CORS_ORIGIN` 與其他對外設定，且不得提交 `.env`。
+
 ## 乾淨環境啟動
 
 以下命令皆從 repository root 執行。
