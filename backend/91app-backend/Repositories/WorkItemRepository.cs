@@ -92,9 +92,12 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
         return true;
     }
 
-    public async Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
+    public async Task<PagedWorkItems> GetWorkItemsForUserAsync(
         Guid userId,
+        WorkItemSortField sortField,
         WorkItemSortOrder sortOrder,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken)
     {
         // ADR 0005：以 LEFT JOIN 取得使用者個人化狀態，未建立紀錄者於下方投影隱式視為 Pending。
@@ -105,12 +108,27 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
             from status in statusGroup.Where(item => item.UserId == userId).DefaultIfEmpty()
             select new { workItem, status };
 
-        // 以 Id 作為次要排序鍵，避免 CreatedAt 相同時排序不穩定。
-        joined = sortOrder == WorkItemSortOrder.Ascending
-            ? joined.OrderBy(item => item.workItem.CreatedAt).ThenBy(item => item.workItem.Id)
-            : joined.OrderByDescending(item => item.workItem.CreatedAt).ThenByDescending(item => item.workItem.Id);
+        // ADR 0015：totalCount 為過濾後總數（軟刪除項目由 Global Query Filter 排除），於分頁前計算。
+        var totalCount = await context.WorkItems.CountAsync(cancellationToken);
 
-        return await joined
+        // 以 Id 作為次要排序鍵，避免主鍵排序值相同時排序不穩定。
+        var ascending = sortOrder == WorkItemSortOrder.Ascending;
+        joined = (sortField, ascending) switch
+        {
+            (WorkItemSortField.Title, true) =>
+                joined.OrderBy(item => item.workItem.Title).ThenBy(item => item.workItem.Id),
+            (WorkItemSortField.Title, false) =>
+                joined.OrderByDescending(item => item.workItem.Title).ThenByDescending(item => item.workItem.Id),
+            (_, true) =>
+                joined.OrderBy(item => item.workItem.CreatedAt).ThenBy(item => item.workItem.Id),
+            _ =>
+                joined.OrderByDescending(item => item.workItem.CreatedAt).ThenByDescending(item => item.workItem.Id),
+        };
+
+        // ADR 0015：排序後於資料庫層以 Skip/Take 套用 server-side 分頁。
+        var items = await joined
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(item => new WorkItemListItem(
                 item.workItem.Id,
                 item.workItem.Title,
@@ -120,6 +138,8 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
                     : WorkItemStatus.Pending,
                 item.workItem.CreatedAt))
             .ToListAsync(cancellationToken);
+
+        return new PagedWorkItems(items, page, pageSize, totalCount);
     }
 
     public async Task<WorkItemDetail?> GetDetailForUserAsync(

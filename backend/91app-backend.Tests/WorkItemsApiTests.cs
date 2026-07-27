@@ -43,31 +43,43 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
     }
 
     [Fact]
-    public async Task Unsupported_sortBy_value_returns_400_envelope()
+    public async Task Unsupported_sortBy_value_falls_back_to_default_sort()
     {
+        // ADR 0015：白名單外的 sortBy 靜默 fallback 回預設（createdAt desc），回 200。
+        var older = NewWorkItem("較舊項目", -2);
+        var newer = NewWorkItem("較新項目", -1);
+        await ReplaceWorkItemsAsync((older, null), (newer, null));
         var token = await LoginAsync("user", UserClientHash);
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/work-items?sortBy=title");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var response = await _client.SendAsync(request);
+        var response = await GetWorkItemsAsync(token, sortBy: "bogus");
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("success").GetBoolean().Should().BeFalse();
-        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        var titles = body.GetProperty("data").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("title").GetString())
+            .ToArray();
+        titles.Should().Equal("較新項目", "較舊項目");
     }
 
     [Fact]
-    public async Task Unsupported_sortOrder_value_returns_400_envelope()
+    public async Task Unsupported_sortOrder_value_falls_back_to_default_sort()
     {
+        // ADR 0015：白名單外的 sortOrder 靜默 fallback 回預設（desc），回 200。
+        var older = NewWorkItem("較舊項目", -2);
+        var newer = NewWorkItem("較新項目", -1);
+        await ReplaceWorkItemsAsync((older, null), (newer, null));
         var token = await LoginAsync("user", UserClientHash);
 
         var response = await GetWorkItemsAsync(token, "sideways");
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("success").GetBoolean().Should().BeFalse();
-        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        var titles = body.GetProperty("data").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("title").GetString())
+            .ToArray();
+        titles.Should().Equal("較新項目", "較舊項目");
     }
 
     [Fact]
@@ -81,7 +93,11 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("success").GetBoolean().Should().BeTrue();
-        body.GetProperty("data").GetArrayLength().Should().Be(0);
+        var data = body.GetProperty("data");
+        data.GetProperty("items").GetArrayLength().Should().Be(0);
+        data.GetProperty("totalCount").GetInt32().Should().Be(0);
+        data.GetProperty("page").GetInt32().Should().Be(1);
+        data.GetProperty("pageSize").GetInt32().Should().Be(20);
     }
 
     [Fact]
@@ -106,8 +122,8 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
         var adminBody = await (await GetWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
 
-        userBody.GetProperty("data").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Confirmed");
-        adminBody.GetProperty("data").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Pending");
+        userBody.GetProperty("data").GetProperty("items").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Confirmed");
+        adminBody.GetProperty("data").GetProperty("items").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Pending");
     }
 
     [Theory]
@@ -135,10 +151,94 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         var response = await GetWorkItemsAsync(token, sortOrder);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var titles = body.GetProperty("data").EnumerateArray()
+        var titles = body.GetProperty("data").GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("title").GetString())
             .ToArray();
         titles.Should().Equal(expectedTitles);
+    }
+
+    [Theory]
+    [InlineData("asc", new[] { "Apple", "Zebra" })]
+    [InlineData("desc", new[] { "Zebra", "Apple" })]
+    public async Task Sorts_by_title_in_the_requested_order(string sortOrder, string[] expectedTitles)
+    {
+        // 標題排序與建立時間刻意相反，確保驗證的是 title 分支而非 createdAt。
+        var apple = new WorkItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Apple",
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
+            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-1)
+        };
+        var zebra = new WorkItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Zebra",
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-2),
+            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-2)
+        };
+        await ReplaceWorkItemsAsync((apple, null), (zebra, null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await GetWorkItemsAsync(token, sortOrder, sortBy: "title");
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var titles = body.GetProperty("data").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("title").GetString())
+            .ToArray();
+        titles.Should().Equal(expectedTitles);
+    }
+
+    [Fact]
+    public async Task Paginates_and_reports_filtered_total_count()
+    {
+        // 建立 3 筆（createdAt 遞增）；預設 desc 下第一頁為最新兩筆。
+        await SeedWorkItemsAsync(3);
+        var token = await LoginAsync("user", UserClientHash);
+
+        var firstPage = await (await GetWorkItemsAsync(token, page: 1, pageSize: 2))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var secondPage = await (await GetWorkItemsAsync(token, page: 2, pageSize: 2))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        var firstData = firstPage.GetProperty("data");
+        firstData.GetProperty("items").GetArrayLength().Should().Be(2);
+        firstData.GetProperty("totalCount").GetInt32().Should().Be(3);
+        firstData.GetProperty("page").GetInt32().Should().Be(1);
+        firstData.GetProperty("pageSize").GetInt32().Should().Be(2);
+
+        var secondData = secondPage.GetProperty("data");
+        secondData.GetProperty("items").GetArrayLength().Should().Be(1);
+        secondData.GetProperty("totalCount").GetInt32().Should().Be(3);
+        secondData.GetProperty("page").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Out_of_range_page_returns_empty_items_with_total_count()
+    {
+        await SeedWorkItemsAsync(3);
+        var token = await LoginAsync("user", UserClientHash);
+
+        var body = await (await GetWorkItemsAsync(token, page: 5, pageSize: 2))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        var data = body.GetProperty("data");
+        data.GetProperty("items").GetArrayLength().Should().Be(0);
+        data.GetProperty("totalCount").GetInt32().Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Defaults_to_page_size_of_20_when_not_specified()
+    {
+        await SeedWorkItemsAsync(21);
+        var token = await LoginAsync("user", UserClientHash);
+
+        var body = await (await GetWorkItemsAsync(token)).Content.ReadFromJsonAsync<JsonElement>();
+
+        var data = body.GetProperty("data");
+        data.GetProperty("items").GetArrayLength().Should().Be(20);
+        data.GetProperty("totalCount").GetInt32().Should().Be(21);
+        data.GetProperty("pageSize").GetInt32().Should().Be(20);
     }
 
     [Fact]
@@ -182,7 +282,7 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
 
         // 成功後列表反映最新狀態。
         var listBody = await (await GetWorkItemsAsync(token)).Content.ReadFromJsonAsync<JsonElement>();
-        listBody.GetProperty("data").EnumerateArray()
+        listBody.GetProperty("data").GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("status").GetString())
             .Should().OnlyContain(status => status == "Confirmed");
     }
@@ -198,7 +298,7 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         await BulkConfirmAsync(userToken, item.Id);
 
         var adminBody = await (await GetWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
-        adminBody.GetProperty("data").EnumerateArray().Single()
+        adminBody.GetProperty("data").GetProperty("items").EnumerateArray().Single()
             .GetProperty("status").GetString().Should().Be("Pending");
     }
 
@@ -284,7 +384,7 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
 
         // 撤銷後列表反映恢復為 Pending。
         var listBody = await (await GetWorkItemsAsync(token)).Content.ReadFromJsonAsync<JsonElement>();
-        listBody.GetProperty("data").EnumerateArray().Single()
+        listBody.GetProperty("data").GetProperty("items").EnumerateArray().Single()
             .GetProperty("status").GetString().Should().Be("Pending");
     }
 
@@ -303,8 +403,8 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         // 僅呼叫者恢復為 Pending，其他使用者維持 Confirmed。
         var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
         var adminBody = await (await GetWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
-        userBody.GetProperty("data").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Pending");
-        adminBody.GetProperty("data").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Confirmed");
+        userBody.GetProperty("data").GetProperty("items").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Pending");
+        adminBody.GetProperty("data").GetProperty("items").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Confirmed");
     }
 
     [Fact]
@@ -322,7 +422,7 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         body.GetProperty("data").GetProperty("revoked").GetBoolean().Should().BeFalse();
 
         var listBody = await (await GetWorkItemsAsync(token)).Content.ReadFromJsonAsync<JsonElement>();
-        listBody.GetProperty("data").EnumerateArray().Single()
+        listBody.GetProperty("data").GetProperty("items").EnumerateArray().Single()
             .GetProperty("status").GetString().Should().Be("Pending");
     }
 
@@ -467,7 +567,7 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
             .GetProperty("title").GetString().Should().Be("新工作項目");
 
         var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
-        userBody.GetProperty("data").EnumerateArray().Single()
+        userBody.GetProperty("data").GetProperty("items").EnumerateArray().Single()
             .GetProperty("title").GetString().Should().Be("新工作項目");
     }
 
@@ -577,9 +677,9 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
             .GetProperty("description").GetString().Should().Be("更新後描述");
 
         var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
-        userBody.GetProperty("data").EnumerateArray().Single()
+        userBody.GetProperty("data").GetProperty("items").EnumerateArray().Single()
             .GetProperty("title").GetString().Should().Be("更新後標題");
-        userBody.GetProperty("data").EnumerateArray().Single()
+        userBody.GetProperty("data").GetProperty("items").EnumerateArray().Single()
             .GetProperty("description").GetString().Should().Be("更新後描述");
     }
 
@@ -667,7 +767,7 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         var adminBody = await (await GetAdminWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
         adminBody.GetProperty("data").GetArrayLength().Should().Be(0);
         var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
-        userBody.GetProperty("data").GetArrayLength().Should().Be(0);
+        userBody.GetProperty("data").GetProperty("items").GetArrayLength().Should().Be(0);
         var detailResponse = await GetWorkItemAsync(userToken, item.Id);
         detailResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
@@ -815,12 +915,31 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         return body.GetProperty("data").GetProperty("accessToken").GetString()!;
     }
 
-    private async Task<HttpResponseMessage> GetWorkItemsAsync(string token, string? sortOrder = null)
+    private async Task<HttpResponseMessage> GetWorkItemsAsync(
+        string token,
+        string? sortOrder = null,
+        string? sortBy = null,
+        int? page = null,
+        int? pageSize = null)
     {
-        var uri = sortOrder is null ? "/api/v1/work-items" : $"/api/v1/work-items?sortOrder={sortOrder}";
+        var query = new List<string>();
+        if (sortOrder is not null) query.Add($"sortOrder={sortOrder}");
+        if (sortBy is not null) query.Add($"sortBy={sortBy}");
+        if (page is not null) query.Add($"page={page}");
+        if (pageSize is not null) query.Add($"pageSize={pageSize}");
+        var uri = query.Count == 0 ? "/api/v1/work-items" : $"/api/v1/work-items?{string.Join("&", query)}";
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return await _client.SendAsync(request);
+    }
+
+    // 建立 count 筆 active Work Item（createdAt 遞增，無個人化狀態）供分頁測試使用。
+    private Task SeedWorkItemsAsync(int count)
+    {
+        var items = Enumerable.Range(0, count)
+            .Select(index => (NewWorkItem($"項目{index:D2}", -(index + 1)), (UserWorkItemStatus?)null))
+            .ToArray();
+        return ReplaceWorkItemsAsync(items);
     }
 
     private async Task ReplaceWorkItemsAsync(params (WorkItem WorkItem, UserWorkItemStatus? Status)[] items)

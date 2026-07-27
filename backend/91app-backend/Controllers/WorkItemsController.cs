@@ -14,37 +14,32 @@ namespace _91app_backend.Controllers;
 public sealed class WorkItemsController(IWorkItemService workItemService) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType<ApiResponse<IReadOnlyList<WorkItemListItem>>>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiResponse<PagedWorkItems>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetWorkItems(
         [FromQuery] string sortBy = "createdAt",
         [FromQuery] string sortOrder = "desc",
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase))
+        // ADR 0015：sortBy／sortOrder 白名單外的值靜默 fallback 回預設（createdAt / desc），不回 400。
+        var sortField = string.Equals(sortBy, "title", StringComparison.OrdinalIgnoreCase)
+            ? WorkItemSortField.Title
+            : WorkItemSortField.CreatedAt;
+        var order = string.Equals(sortOrder, "asc", StringComparison.OrdinalIgnoreCase)
+            ? WorkItemSortOrder.Ascending
+            : WorkItemSortOrder.Descending;
+
+        // 分頁參數防禦性夾限：page 至少為 1、pageSize 非正值時回退預設 20，避免非法 Skip/Take。
+        if (page < 1)
         {
-            return BadRequest(ApiResponse<object>.Fail(
-                "排序欄位不正確",
-                ["sortBy 僅支援 createdAt"],
-                HttpContext.TraceIdentifier));
+            page = 1;
         }
 
-        WorkItemSortOrder order;
-        if (string.Equals(sortOrder, "asc", StringComparison.OrdinalIgnoreCase))
+        if (pageSize < 1)
         {
-            order = WorkItemSortOrder.Ascending;
-        }
-        else if (string.Equals(sortOrder, "desc", StringComparison.OrdinalIgnoreCase))
-        {
-            order = WorkItemSortOrder.Descending;
-        }
-        else
-        {
-            return BadRequest(ApiResponse<object>.Fail(
-                "排序方向不正確",
-                ["sortOrder 僅支援 asc 或 desc"],
-                HttpContext.TraceIdentifier));
+            pageSize = 20;
         }
 
         var subject = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
@@ -56,8 +51,8 @@ public sealed class WorkItemsController(IWorkItemService workItemService) : Cont
                 HttpContext.TraceIdentifier));
         }
 
-        var items = await workItemService.GetWorkItemsForUserAsync(userId, order, cancellationToken);
-        return Ok(ApiResponse<IReadOnlyList<WorkItemListItem>>.Ok(items, "取得工作項目列表成功"));
+        var result = await workItemService.GetWorkItemsForUserAsync(userId, sortField, order, page, pageSize, cancellationToken);
+        return Ok(ApiResponse<PagedWorkItems>.Ok(result, "取得工作項目列表成功"));
     }
 
     [HttpGet("{id:guid}")]

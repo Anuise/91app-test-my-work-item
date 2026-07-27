@@ -32,11 +32,14 @@ public sealed class WorkItemService(IWorkItemRepository workItemRepository) : IW
         CancellationToken cancellationToken) =>
         workItemRepository.DeleteAsync(workItemId, cancellationToken);
 
-    public Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
+    public Task<PagedWorkItems> GetWorkItemsForUserAsync(
         Guid userId,
+        WorkItemSortField sortField,
         WorkItemSortOrder sortOrder,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken) =>
-        workItemRepository.GetWorkItemsForUserAsync(userId, sortOrder, cancellationToken);
+        workItemRepository.GetWorkItemsForUserAsync(userId, sortField, sortOrder, page, pageSize, cancellationToken);
 
     public Task<WorkItemDetail?> GetDetailForUserAsync(
         Guid userId,
