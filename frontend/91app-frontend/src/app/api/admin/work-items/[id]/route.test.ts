@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { PUT } from "./route";
+import { DELETE, PUT } from "./route";
 
 const getCookie = vi.fn();
 
@@ -64,6 +64,68 @@ describe("Admin Work Item detail API proxy", () => {
     expect(await response.json()).toMatchObject({
       success: false,
       traceId: "trace-404",
+    });
+  });
+
+  test("沒有登入時 DELETE 回傳 401 且不呼叫後端", async () => {
+    getCookie.mockReturnValue(undefined);
+
+    const response = await DELETE(
+      new Request("http://localhost/api/admin/work-items/work-item-id", { method: "DELETE" }),
+      { params: Promise.resolve({ id: "work-item-id" }) },
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      errors: ["Authentication required"],
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test("登入 Admin 時 DELETE 轉發 id 與 Bearer token", async () => {
+    getCookie.mockReturnValue({ value: "admin-jwt" });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+      success: true,
+      data: { id: "work-item-id" },
+      message: "刪除工作項目成功",
+    }), { status: 200 }));
+
+    const response = await DELETE(
+      new Request("http://localhost/api/admin/work-items/work-item-id", { method: "DELETE" }),
+      { params: Promise.resolve({ id: "work-item-id" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true });
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:5206/api/v1/admin/work-items/work-item-id",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: { Authorization: "Bearer admin-jwt" },
+      }),
+    );
+  });
+
+  test("DELETE 後端 404 envelope 會原樣回傳", async () => {
+    getCookie.mockReturnValue({ value: "admin-jwt" });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+      success: false,
+      data: null,
+      message: "找不到工作項目",
+      errors: ["Work item not found"],
+      traceId: "trace-delete-404",
+    }), { status: 404 }));
+
+    const response = await DELETE(
+      new Request("http://localhost/api/admin/work-items/missing", { method: "DELETE" }),
+      { params: Promise.resolve({ id: "missing" }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      traceId: "trace-delete-404",
     });
   });
 });

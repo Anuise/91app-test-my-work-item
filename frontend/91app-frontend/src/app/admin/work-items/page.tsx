@@ -1,13 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { AUTH_COOKIE_NAME, BACKEND_API_URL } from "@/lib/server-auth";
-
-type AdminWorkItem = {
-  id: string;
-  title: string;
-  description: string | null;
-  createdAt: string;
-};
+import { AdminWorkItemsList, type AdminWorkItem } from "./admin-work-items-list";
 
 type AdminWorkItemsPayload = {
   success: true;
@@ -62,28 +56,7 @@ export default async function AdminWorkItemsPage({
             </p>
           ) : null}
           <h1 className="text-3xl font-semibold tracking-tight">工作項目管理</h1>
-          {items.length === 0 ? (
-            <p className="mt-8 text-sm text-slate-500">目前沒有工作項目。</p>
-          ) : (
-            <ul className="mt-8 divide-y divide-slate-200">
-              {items.map((item) => (
-                <li className="py-5" key={item.id}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-slate-900">{item.title}</p>
-                      {item.description ? <p className="mt-1 text-sm text-slate-600">{item.description}</p> : null}
-                    </div>
-                    <Link
-                      className="shrink-0 text-sm font-semibold text-blue-600 hover:text-blue-700"
-                      href={`/admin/work-items/${item.id}/edit`}
-                    >
-                      編輯
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <AdminWorkItemsList items={items} />
         </div>
       </section>
     </main>

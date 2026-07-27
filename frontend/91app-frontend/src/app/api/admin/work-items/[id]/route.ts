@@ -35,3 +35,20 @@ export async function PUT(
   });
   return NextResponse.json(await backendResponse.json(), { status: backendResponse.status });
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    return unauthorizedResponse();
+  }
+
+  const { id } = await params;
+  const backendResponse = await fetch(`${BACKEND_API_URL}/api/v1/admin/work-items/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return NextResponse.json(await backendResponse.json(), { status: backendResponse.status });
+}

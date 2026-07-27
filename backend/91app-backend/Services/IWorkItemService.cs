@@ -22,6 +22,10 @@ public interface IWorkItemService
         string? description,
         CancellationToken cancellationToken);
 
+    Task<bool> DeleteAsync(
+        Guid workItemId,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,

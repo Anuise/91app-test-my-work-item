@@ -75,6 +75,23 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
             workItem.UpdatedAt);
     }
 
+    public async Task<bool> DeleteAsync(
+        Guid workItemId,
+        CancellationToken cancellationToken)
+    {
+        var workItem = await context.WorkItems
+            .FirstOrDefaultAsync(item => item.Id == workItemId, cancellationToken);
+        if (workItem is null)
+        {
+            return false;
+        }
+
+        workItem.IsDeleted = true;
+        workItem.UpdatedAt = DateTimeOffset.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,

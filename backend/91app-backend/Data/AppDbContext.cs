@@ -28,6 +28,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         workItem.Property(item => item.Description).HasMaxLength(2000);
         workItem.Property(item => item.CreatedAt).IsRequired();
         workItem.Property(item => item.UpdatedAt).IsRequired();
+        workItem.Property(item => item.IsDeleted).IsRequired();
+        workItem.HasQueryFilter(item => !item.IsDeleted);
 
         var userWorkItemStatus = modelBuilder.Entity<UserWorkItemStatus>();
         userWorkItemStatus.ToTable("UserWorkItemStatuses");
