@@ -24,7 +24,7 @@ public static class DatabaseInitializer
 
         var createdAt = new DateTimeOffset(2026, 7, 26, 0, 0, 0, TimeSpan.Zero);
 
-        if (!await context.Users.AnyAsync())
+        if (!await context.Users.AnyAsync(item => item.Username == "user"))
         {
             var user = new User
             {
@@ -35,6 +35,25 @@ public static class DatabaseInitializer
                 PasswordHash = UserPasswordHash,
                 CreatedAt = createdAt
             };
+            context.Users.Add(user);
+        }
+
+        if (!await context.Users.AnyAsync(item => item.Username == "user2"))
+        {
+            var secondUser = new User
+            {
+                Id = Guid.Parse("7489e3ba-fde8-4a79-8bcb-ced424509de3"),
+                Username = "user2",
+                Name = "User 2",
+                Role = "User",
+                PasswordHash = UserPasswordHash,
+                CreatedAt = createdAt
+            };
+            context.Users.Add(secondUser);
+        }
+
+        if (!await context.Users.AnyAsync(item => item.Username == "admin"))
+        {
             var admin = new User
             {
                 Id = Guid.Parse("88afcf77-64af-4b9b-8414-5737be0906f2"),
@@ -44,7 +63,7 @@ public static class DatabaseInitializer
                 PasswordHash = AdminPasswordHash,
                 CreatedAt = createdAt
             };
-            context.Users.AddRange(user, admin);
+            context.Users.Add(admin);
         }
 
         if (!await context.WorkItems.AnyAsync())

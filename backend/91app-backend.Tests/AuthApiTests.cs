@@ -48,6 +48,21 @@ public sealed class AuthApiTests : IClassFixture<AuthApiFactory>
     }
 
     [Fact]
+    public async Task Second_seed_user_can_login_for_status_isolation_smoke_test()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            username = "user2",
+            clientHash = UserClientHash
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("data").GetProperty("user").GetProperty("name").GetString().Should().Be("User 2");
+        body.GetProperty("data").GetProperty("user").GetProperty("role").GetString().Should().Be("User");
+    }
+
+    [Fact]
     public async Task Invalid_credentials_return_consistent_error_envelope_with_trace_id()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new
@@ -128,7 +143,9 @@ public sealed class AuthApiTests : IClassFixture<AuthApiFactory>
         script.Should().Contain("CREATE TABLE \"Users\"");
         script.Should().Contain("CREATE UNIQUE INDEX \"IX_Users_Username\"");
         script.Should().Contain("'user'");
+        script.Should().Contain("'user2'");
         script.Should().Contain("'admin'");
+        script.Should().Contain("ALTER TABLE \"WorkItems\" ADD \"IsDeleted\"");
     }
 }
 
