@@ -8,4 +8,9 @@ public interface IWorkItemService
         Guid userId,
         WorkItemSortOrder sortOrder,
         CancellationToken cancellationToken);
+
+    Task<BulkConfirmResult> BulkConfirmAsync(
+        Guid userId,
+        IReadOnlyList<Guid> workItemIds,
+        CancellationToken cancellationToken);
 }

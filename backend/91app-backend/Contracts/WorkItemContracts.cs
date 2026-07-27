@@ -13,3 +13,7 @@ public sealed record WorkItemListItem(
     string Title,
     WorkItemStatus Status,
     DateTimeOffset CreatedAt);
+
+public sealed record BulkConfirmRequest(IReadOnlyList<Guid> WorkItemIds);
+
+public sealed record BulkConfirmResult(int ConfirmedCount, int IgnoredCount);
