@@ -1,16 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import AdminWorkItemsPage from "./page";
+import { renderWithProviders, signIn } from "@/test-utils";
 
-const getCookie = vi.fn();
+const state = vi.hoisted(() => ({ search: "" }));
 
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: getCookie }),
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(state.search),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 describe("Admin 工作項目管理", () => {
   beforeEach(() => {
-    getCookie.mockReturnValue({ value: "signed-jwt" });
+    state.search = "";
+    signIn("Admin");
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       success: true,
       data: [{
@@ -24,18 +27,31 @@ describe("Admin 工作項目管理", () => {
   });
 
   test("建立成功時顯示成功訊息與項目", async () => {
-    render(await AdminWorkItemsPage({ searchParams: Promise.resolve({ created: "1" }) }));
+    state.search = "created=1";
+
+    renderWithProviders(<AdminWorkItemsPage />);
 
     expect(screen.getByRole("status")).toHaveTextContent("工作項目建立成功。");
-    expect(screen.getByText("新的工作項目")).toBeInTheDocument();
+    expect(await screen.findByText("新的工作項目")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "編輯" })).toHaveAttribute(
       "href",
       "/admin/work-items/work-item-id/edit",
     );
   });
 
+  test("列表以 Bearer token 向 BFF 取得資料", async () => {
+    renderWithProviders(<AdminWorkItemsPage />);
+
+    expect(await screen.findByText("新的工作項目")).toBeInTheDocument();
+    const [path, init] = vi.mocked(fetch).mock.calls[0];
+    expect(path).toBe("/api/admin/work-items");
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer admin-jwt");
+  });
+
   test("更新成功時顯示成功訊息", async () => {
-    render(await AdminWorkItemsPage({ searchParams: Promise.resolve({ updated: "1" }) }));
+    state.search = "updated=1";
+
+    renderWithProviders(<AdminWorkItemsPage />);
 
     expect(screen.getByRole("status")).toHaveTextContent("工作項目更新成功。");
   });
@@ -49,9 +65,9 @@ describe("Admin 工作項目管理", () => {
       traceId: "trace-403",
     }), { status: 403 }));
 
-    render(await AdminWorkItemsPage({ searchParams: Promise.resolve({}) }));
+    renderWithProviders(<AdminWorkItemsPage />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("權限不足，僅限 Admin 角色");
+    expect(await screen.findByRole("alert")).toHaveTextContent("權限不足，僅限 Admin 角色");
     expect(screen.getByText("目前沒有工作項目。")).toBeInTheDocument();
   });
 });

@@ -1,15 +1,10 @@
+import { saveSession, type Session } from "./session";
+
 const PASSWORD_SALT = process.env.NEXT_PUBLIC_PASSWORD_SALT ?? "MyWorkItem-System-Salt-v1";
 
 type LoginSuccess = {
   success: true;
-  data: {
-    expiresAt: string;
-    user: {
-      id: string;
-      name: string;
-      role: "User" | "Admin";
-    };
-  };
+  data: Session;
   message: string;
 };
 
@@ -27,7 +22,7 @@ export async function hashPassword(password: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function login(username: string, password: string): Promise<LoginSuccess> {
+export async function login(username: string, password: string): Promise<Session> {
   const clientHash = await hashPassword(password);
   const response = await fetch("/api/auth/login", {
     method: "POST",
@@ -40,5 +35,8 @@ export async function login(username: string, password: string): Promise<LoginSu
     throw payload;
   }
 
-  return payload;
+  // ADR 0010 補註 B：token 與 Claims 存入 localStorage，後續請求以 Bearer 攜帶。
+  saveSession(payload.data);
+
+  return payload.data;
 }

@@ -1,30 +1,16 @@
-import { cookies } from "next/headers";
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { AUTH_COOKIE_NAME, BACKEND_API_URL } from "@/lib/server-auth";
+import { useSearchParams } from "next/navigation";
+import AuthGuard from "@/components/auth-guard";
+import { readSession } from "@/lib/session";
 import WorkItemsList from "./WorkItemsList";
 
-type WorkItemsPageProps = {
-  searchParams?: Promise<{ notice?: string }>;
-};
-
-export default async function WorkItemsPage({ searchParams = Promise.resolve({}) }: WorkItemsPageProps = {}) {
-  const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
-  if (!accessToken) {
-    redirect("/");
-  }
-
-  const response = await fetch(`${BACKEND_API_URL}/api/v1/auth/session`, {
-    cache: "no-store",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!response.ok) {
-    redirect("/");
-  }
-  const session = await response.json() as {
-    data: { role: "User" | "Admin" };
-  };
-  const { notice } = await searchParams;
+function WorkItemsPageContent() {
+  const searchParams = useSearchParams();
+  const notice = searchParams.get("notice");
+  // AuthGuard 通過後才會渲染，此處必然有 session。
+  const role = readSession()?.user.role;
 
   return (
     <main className="min-h-screen px-5 py-8 text-slate-900 sm:px-8">
@@ -34,7 +20,7 @@ export default async function WorkItemsPage({ searchParams = Promise.resolve({})
             <span className="grid size-10 place-items-center rounded-xl bg-blue-600 text-white">91</span>
             My Work Item
           </div>
-          {session.data.role === "Admin" ? (
+          {role === "Admin" ? (
             <Link className="text-sm font-semibold text-blue-600 hover:text-blue-700" href="/admin/work-items">
               後台管理
             </Link>
@@ -54,5 +40,13 @@ export default async function WorkItemsPage({ searchParams = Promise.resolve({})
         </div>
       </section>
     </main>
+  );
+}
+
+export default function WorkItemsPage() {
+  return (
+    <AuthGuard>
+      <WorkItemsPageContent />
+    </AuthGuard>
   );
 }

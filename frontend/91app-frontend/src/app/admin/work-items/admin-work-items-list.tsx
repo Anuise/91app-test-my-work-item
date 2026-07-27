@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ApiError, authedFetch } from "@/lib/api-client";
 
 export type AdminWorkItem = {
   id: string;
@@ -19,12 +20,6 @@ type Feedback = {
   text: string;
 };
 
-type DeletePayload = {
-  success: boolean;
-  message: string;
-  errors?: string[];
-};
-
 export function AdminWorkItemsList({ items: initialItems }: AdminWorkItemsListProps) {
   const [items, setItems] = useState(initialItems);
   const [deleteTarget, setDeleteTarget] = useState<AdminWorkItem | null>(null);
@@ -39,22 +34,17 @@ export function AdminWorkItemsList({ items: initialItems }: AdminWorkItemsListPr
     const target = deleteTarget;
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/admin/work-items/${target.id}`, { method: "DELETE" });
-      const payload = await response.json() as DeletePayload;
-      if (!response.ok || !payload.success) {
-        setFeedback({
-          type: "error",
-          text: payload.errors?.[0] ?? payload.message ?? "刪除工作項目失敗",
-        });
-        setDeleteTarget(null);
-        return;
-      }
-
+      const { message } = await authedFetch(`/api/admin/work-items/${target.id}`, { method: "DELETE" });
       setItems((current) => current.filter((item) => item.id !== target.id));
-      setFeedback({ type: "success", text: payload.message });
+      setFeedback({ type: "success", text: message });
       setDeleteTarget(null);
-    } catch {
-      setFeedback({ type: "error", text: "刪除工作項目失敗，請稍後再試" });
+    } catch (reason) {
+      setFeedback({
+        type: "error",
+        text: reason instanceof ApiError
+          ? reason.errors[0] ?? reason.message
+          : "刪除工作項目失敗，請稍後再試",
+      });
       setDeleteTarget(null);
     } finally {
       setIsDeleting(false);

@@ -1,34 +1,22 @@
-import { cookies } from "next/headers";
+"use client";
+
 import Link from "next/link";
-import { AUTH_COOKIE_NAME, BACKEND_API_URL } from "@/lib/server-auth";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { authedFetch } from "@/lib/api-client";
 import { AdminWorkItemsList, type AdminWorkItem } from "./admin-work-items-list";
 
-type AdminWorkItemsPayload = {
-  success: true;
-  data: AdminWorkItem[];
-  message: string;
-} | {
-  success: false;
-  data: null;
-  message: string;
-  errors: string[];
-  traceId?: string;
-};
+export default function AdminWorkItemsPage() {
+  const searchParams = useSearchParams();
+  const created = searchParams.get("created");
+  const updated = searchParams.get("updated");
 
-export default async function AdminWorkItemsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ created?: string; updated?: string }>;
-}) {
-  const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
-  const response = await fetch(`${BACKEND_API_URL}/api/v1/admin/work-items`, {
-    cache: "no-store",
-    headers: { Authorization: `Bearer ${accessToken}` },
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["admin-work-items"],
+    queryFn: async () => (await authedFetch<AdminWorkItem[]>("/api/admin/work-items")).data,
+    retry: false,
   });
-  const payload = await response.json() as AdminWorkItemsPayload;
-  const items = response.ok && payload.success ? payload.data : [];
-  const loadError = response.ok && payload.success ? "" : payload.message;
-  const { created, updated } = await searchParams;
+  const loadError = error instanceof Error ? error.message : "";
 
   return (
     <main className="min-h-screen px-5 py-8 text-slate-900 sm:px-8">
@@ -56,7 +44,11 @@ export default async function AdminWorkItemsPage({
             </p>
           ) : null}
           <h1 className="text-3xl font-semibold tracking-tight">工作項目管理</h1>
-          <AdminWorkItemsList items={items} />
+          {isLoading ? (
+            <p className="mt-8 text-sm text-slate-500">載入中…</p>
+          ) : (
+            <AdminWorkItemsList items={data ?? []} />
+          )}
         </div>
       </section>
     </main>

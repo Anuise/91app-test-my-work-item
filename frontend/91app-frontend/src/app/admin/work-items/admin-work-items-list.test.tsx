@@ -64,7 +64,9 @@ describe("AdminWorkItemsList", () => {
 
     expect(await screen.findByRole("status")).toHaveTextContent("刪除工作項目成功");
     expect(screen.queryByText("待刪除項目")).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith("/api/admin/work-items/work-item-id", { method: "DELETE" });
+    const [path, init] = fetchMock.mock.calls[0];
+    expect(path).toBe("/api/admin/work-items/work-item-id");
+    expect(init?.method).toBe("DELETE");
   });
 
   test("刪除 API 失敗時顯示錯誤並保留原列", async () => {

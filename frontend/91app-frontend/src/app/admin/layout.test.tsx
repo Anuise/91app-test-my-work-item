@@ -1,46 +1,41 @@
-import { render, screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import AdminLayout from "./layout";
+import { renderWithProviders, signIn } from "@/test-utils";
 
-const { getCookie, redirect } = vi.hoisted(() => ({
-  getCookie: vi.fn(),
-  redirect: vi.fn(),
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
 }));
-
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: getCookie }),
-}));
-
-vi.mock("next/navigation", () => ({ redirect }));
 
 describe("Admin 路由守衛", () => {
   beforeEach(() => {
-    getCookie.mockReturnValue({ value: "signed-jwt" });
-    redirect.mockReset();
+    replace.mockReset();
+  });
+
+  test("未登入直接進入 Admin 路由會導回登入頁", async () => {
+    renderWithProviders(<AdminLayout><div>Admin content</div></AdminLayout>);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText("Admin content")).not.toBeInTheDocument();
   });
 
   test("一般 User 直接進入 Admin 路由會被導回列表", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      success: true,
-      data: { id: "user-id", name: "User", role: "User" },
-      message: "登入狀態有效",
-    }), { status: 200 })));
+    signIn("User");
 
-    await AdminLayout({ children: <div>Admin content</div> });
+    renderWithProviders(<AdminLayout><div>Admin content</div></AdminLayout>);
 
-    expect(redirect).toHaveBeenCalledWith("/work-items?notice=forbidden");
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/work-items?notice=forbidden"));
+    expect(screen.queryByText("Admin content")).not.toBeInTheDocument();
   });
 
   test("Admin 可以進入管理路由", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      success: true,
-      data: { id: "admin-id", name: "Admin", role: "Admin" },
-      message: "登入狀態有效",
-    }), { status: 200 })));
+    signIn("Admin");
 
-    render(await AdminLayout({ children: <div>Admin content</div> }));
+    renderWithProviders(<AdminLayout><div>Admin content</div></AdminLayout>);
 
-    expect(screen.getByText("Admin content")).toBeInTheDocument();
-    expect(redirect).not.toHaveBeenCalled();
+    expect(await screen.findByText("Admin content")).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
   });
 });

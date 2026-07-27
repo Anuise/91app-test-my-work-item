@@ -1,20 +1,50 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { DELETE, PUT } from "./route";
+import { DELETE, GET, PUT } from "./route";
 
-const getCookie = vi.fn();
+function adminRequest(id: string, token?: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: getCookie }),
-}));
+  return new Request(`http://localhost/api/admin/work-items/${id}`, { ...init, headers });
+}
 
 describe("Admin Work Item detail API proxy", () => {
   beforeEach(() => {
-    getCookie.mockReset();
     vi.stubGlobal("fetch", vi.fn());
   });
 
-  test("登入 Admin 時 PUT 轉發請求與回應", async () => {
-    getCookie.mockReturnValue({ value: "admin-jwt" });
+  test("帶 Admin token 時 GET 轉發 id 與 Bearer token", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+      success: true,
+      data: { id: "work-item-id", title: "既有標題", description: "既有描述" },
+      message: "取得工作項目成功",
+    }), { status: 200 }));
+
+    const response = await GET(
+      adminRequest("work-item-id", "admin-jwt"),
+      { params: Promise.resolve({ id: "work-item-id" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:8000/api/v1/admin/work-items/work-item-id",
+      expect.objectContaining({ headers: { Authorization: "Bearer admin-jwt" } }),
+    );
+  });
+
+  test("沒有 Bearer token 時 GET 回傳 401 且不呼叫後端", async () => {
+    const response = await GET(
+      adminRequest("work-item-id"),
+      { params: Promise.resolve({ id: "work-item-id" }) },
+    );
+
+    expect(response.status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test("帶 Admin token 時 PUT 轉發請求與回應", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       success: true,
       data: { id: "work-item-id", title: "更新後標題", description: "更新後描述" },
@@ -22,7 +52,7 @@ describe("Admin Work Item detail API proxy", () => {
     }), { status: 200 }));
 
     const response = await PUT(
-      new Request("http://localhost/api/admin/work-items/work-item-id", {
+      adminRequest("work-item-id", "admin-jwt", {
         method: "PUT",
         body: JSON.stringify({ title: "更新後標題", description: "更新後描述" }),
         headers: { "Content-Type": "application/json" },
@@ -33,7 +63,7 @@ describe("Admin Work Item detail API proxy", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true });
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:5206/api/v1/admin/work-items/work-item-id",
+      "http://localhost:8000/api/v1/admin/work-items/work-item-id",
       expect.objectContaining({
         method: "PUT",
         headers: { Authorization: "Bearer admin-jwt", "Content-Type": "application/json" },
@@ -43,7 +73,6 @@ describe("Admin Work Item detail API proxy", () => {
   });
 
   test("後端 404 envelope 會原樣回傳", async () => {
-    getCookie.mockReturnValue({ value: "admin-jwt" });
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       success: false,
       data: null,
@@ -53,7 +82,7 @@ describe("Admin Work Item detail API proxy", () => {
     }), { status: 404 }));
 
     const response = await PUT(
-      new Request("http://localhost/api/admin/work-items/missing", {
+      adminRequest("missing", "admin-jwt", {
         method: "PUT",
         body: JSON.stringify({ title: "新標題" }),
       }),
@@ -67,11 +96,9 @@ describe("Admin Work Item detail API proxy", () => {
     });
   });
 
-  test("沒有登入時 DELETE 回傳 401 且不呼叫後端", async () => {
-    getCookie.mockReturnValue(undefined);
-
+  test("沒有 Bearer token 時 DELETE 回傳 401 且不呼叫後端", async () => {
     const response = await DELETE(
-      new Request("http://localhost/api/admin/work-items/work-item-id", { method: "DELETE" }),
+      adminRequest("work-item-id", undefined, { method: "DELETE" }),
       { params: Promise.resolve({ id: "work-item-id" }) },
     );
 
@@ -83,8 +110,7 @@ describe("Admin Work Item detail API proxy", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  test("登入 Admin 時 DELETE 轉發 id 與 Bearer token", async () => {
-    getCookie.mockReturnValue({ value: "admin-jwt" });
+  test("帶 Admin token 時 DELETE 轉發 id 與 Bearer token", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       success: true,
       data: { id: "work-item-id" },
@@ -92,14 +118,14 @@ describe("Admin Work Item detail API proxy", () => {
     }), { status: 200 }));
 
     const response = await DELETE(
-      new Request("http://localhost/api/admin/work-items/work-item-id", { method: "DELETE" }),
+      adminRequest("work-item-id", "admin-jwt", { method: "DELETE" }),
       { params: Promise.resolve({ id: "work-item-id" }) },
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true });
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:5206/api/v1/admin/work-items/work-item-id",
+      "http://localhost:8000/api/v1/admin/work-items/work-item-id",
       expect.objectContaining({
         method: "DELETE",
         headers: { Authorization: "Bearer admin-jwt" },
@@ -108,7 +134,6 @@ describe("Admin Work Item detail API proxy", () => {
   });
 
   test("DELETE 後端 404 envelope 會原樣回傳", async () => {
-    getCookie.mockReturnValue({ value: "admin-jwt" });
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       success: false,
       data: null,
@@ -118,7 +143,7 @@ describe("Admin Work Item detail API proxy", () => {
     }), { status: 404 }));
 
     const response = await DELETE(
-      new Request("http://localhost/api/admin/work-items/missing", { method: "DELETE" }),
+      adminRequest("missing", "admin-jwt", { method: "DELETE" }),
       { params: Promise.resolve({ id: "missing" }) },
     );
 
