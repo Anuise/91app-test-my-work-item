@@ -34,9 +34,9 @@ export function AdminWorkItemsList({ items: initialItems }: AdminWorkItemsListPr
     const target = deleteTarget;
     setIsDeleting(true);
     try {
-      const { message } = await authedFetch(`/api/admin/work-items/${target.id}`, { method: "DELETE" });
+      await authedFetch(`/api/admin/work-items/${target.id}`, { method: "DELETE" });
       setItems((current) => current.filter((item) => item.id !== target.id));
-      setFeedback({ type: "success", text: message });
+      setFeedback({ type: "success", text: "刪除成功" });
       setDeleteTarget(null);
     } catch (reason) {
       setFeedback({
@@ -108,9 +108,9 @@ export function AdminWorkItemsList({ items: initialItems }: AdminWorkItemsListPr
             className="w-full max-w-md rounded-2xl border border-white/50 bg-white/90 p-6 shadow-xl backdrop-blur-md"
             role="dialog"
           >
-            <h2 className="text-lg font-semibold text-slate-900" id="delete-dialog-title">刪除確認</h2>
+            <h2 className="text-lg font-semibold text-slate-900" id="delete-dialog-title">確定要刪除此項目嗎？</h2>
             <p className="mt-2 text-sm text-slate-600">
-              確定要刪除「{deleteTarget.title}」嗎？
+              項目「{deleteTarget.title}」將從列表移除。
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
