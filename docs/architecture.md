@@ -2,13 +2,13 @@
 
 本專案「My Work Item」採用 C4 Model 描述系統環境 (Context) 與容器 (Container) 架構。
 
-本文件描述目標架構；尚未整合至產品程式碼的技術會標示為「已決策，待落地」。`markitdown/` 為獨立輔助專案，不屬於 My Work Item 產品架構。
+本文件描述目前已落地的產品架構。`markitdown/` 為獨立輔助專案，不屬於 My Work Item 產品架構。
 
 ## 軟體版本基準
 
 | 軟體 | 版本基準 | 實作狀態 |
 | --- | --- | --- |
-| Node.js | 20 | 已決策，待落地 |
+| Node.js | 20 以上 | 已落地 |
 | Next.js | 16 | 已落地 |
 | React | 19 | 已落地 |
 | Tailwind CSS | 4 | 已落地 |
@@ -16,8 +16,8 @@
 | .NET SDK / Runtime | 10 | 已落地 |
 | PostgreSQL | 16 | 已落地 |
 | EF Core / Npgsql | 10 | 已落地 |
-| TanStack Query | 待導入時決定 | 已決策，待落地 |
-| Docker / Docker Compose | 不鎖定版本 | 已決策，待落地 |
+| TanStack Query | 5 | 已落地 |
+| Docker / Docker Compose | 不鎖定版本 | 已落地 |
 
 架構文件僅記錄主要版本；套件的精確版本以 manifest 與 lockfile 為準。
 
@@ -54,13 +54,13 @@ C4Container
     Person(admin, "後台管理者 (Admin)", "使用 Web 瀏覽器")
 
     ContainerBoundary(c1, "My Work Item System") {
-        Container(frontend, "Next.js Frontend", "Next.js 16, React 19, Tailwind CSS 4", "提供微光玻璃擬態 UI 介面、TanStack Query 狀態管理與路由防護。")
+        Container(frontend, "Next.js Frontend", "Next.js 16, React 19, Tailwind CSS 4", "提供 Web UI、HttpOnly session BFF、TanStack Query 狀態管理與路由防護。")
         Container(backend, ".NET Web API Backend", "C#, .NET 10, EF Core", "提供三層架構 RESTful API、JWT 驗證、Serilog Trace-ID 追蹤與全域 Exception 處理。")
         ContainerDb(database, "PostgreSQL Database", "PostgreSQL 16", "持久化儲存 Users, WorkItems 與 UserWorkItemStatuses 資料。")
     }
 
     Rel(user, frontend, "訪問 /work-items", "HTTPS")
     Rel(admin, frontend, "訪問 /admin/work-items", "HTTPS")
-    Rel(frontend, backend, "呼叫 JSON REST API (帶有 X-Trace-ID & Bearer Token)", "HTTP/REST")
+    Rel(frontend, backend, "呼叫 JSON REST API (帶有 Bearer Token)", "HTTP/REST")
     Rel(backend, database, "讀寫資料 (EF Core / Npgsql)", "TCP / Port 5432")
 ```

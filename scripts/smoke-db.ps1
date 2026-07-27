@@ -1,12 +1,12 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     本機 PostgreSQL 容器的 smoke check：驗證資料庫健康狀態、EF Core migration 與登入種子資料。
 .DESCRIPTION
     可重複執行的驗證流程：
       1. 啟動 db 容器並等待 healthcheck 為 healthy。
-      2. 透過 dotnet ef 套用 Code First migration（migration 內含 user/admin 種子）。
-      3. 以 psql 查詢確認 migration 紀錄與可登入的 user、admin 帳號存在。
+      2. 透過 dotnet ef 套用 Code First migration（migration 內含三個 Demo 帳號）。
+      3. 以 psql 查詢確認最新 migration 與三個 Demo 帳號存在。
     成功時輸出 "SMOKE CHECK PASSED" 並以 exit code 0 結束；任何一步失敗即以非 0 結束。
 #>
 [CmdletBinding()]
@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
-$MigrationId = '20260726143000_CreateUsers'
+$MigrationId = '20260727160000_SeedSecondDemoUser'
 
 # 讀取設定：環境變數優先，其次 .env，最後採用與 docker-compose.yml 相同的預設值。
 function Get-EnvValue {
@@ -61,15 +61,15 @@ dotnet tool restore
 if ($LASTEXITCODE -ne 0) { throw 'dotnet tool restore 失敗' }
 dotnet restore backend/91app-backend/91app-backend.csproj
 if ($LASTEXITCODE -ne 0) { throw 'dotnet restore 失敗' }
-dotnet ef database update --project backend/91app-backend/91app-backend.csproj
+dotnet ef database update --configuration Release --project backend/91app-backend/91app-backend.csproj
 if ($LASTEXITCODE -ne 0) { throw 'EF Core migration 套用失敗' }
 
-Write-Host '==> 4/4 驗證 migration 紀錄與登入種子資料'
+Write-Host '==> 4/4 驗證 migration 紀錄與 Demo 資料'
 $migrationHit = Invoke-Psql "SELECT COUNT(*) FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '$MigrationId';"
 if ($migrationHit -ne '1') { throw "migration $MigrationId 未套用（命中：$migrationHit）" }
-$seedHit = Invoke-Psql "SELECT COUNT(*) FROM ""Users"" WHERE ""Username"" IN ('user', 'admin');"
-if ($seedHit -ne '2') { throw "種子帳號不完整（找到 $seedHit / 2）" }
+$seedHit = Invoke-Psql "SELECT COUNT(*) FROM ""Users"" WHERE ""Username"" IN ('user', 'user2', 'admin');"
+if ($seedHit -ne '3') { throw "Demo 帳號不完整（找到 $seedHit / 3）" }
 
 Write-Host ''
-Write-Host 'SMOKE CHECK PASSED — 資料庫 healthy、migration 已套用、種子帳號 user/admin 就緒' -ForegroundColor Green
+Write-Host 'SMOKE CHECK PASSED — 資料庫 healthy、最新 migration 已套用、三個 Demo 帳號就緒' -ForegroundColor Green
 exit 0
