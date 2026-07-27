@@ -54,6 +54,7 @@ public static class DatabaseInitializer
                 {
                     Id = Guid.Parse("1a1f0a3c-3b6d-4b8a-9c0a-1e2d3c4b5a61"),
                     Title = "設定本機開發環境",
+                    Description = "安裝 .NET 10 SDK、Node.js 與 Docker，並以 docker compose 啟動 PostgreSQL 資料庫。",
                     CreatedAt = createdAt.AddHours(1),
                     UpdatedAt = createdAt.AddHours(1)
                 },
@@ -61,6 +62,7 @@ public static class DatabaseInitializer
                 {
                     Id = Guid.Parse("2b2f0b4c-4c7e-4c9b-8d1b-2f3e4d5c6b72"),
                     Title = "撰寫個人化狀態單元測試",
+                    Description = "涵蓋隱式 Pending、冪等 Confirmed upsert 與撤銷轉換等個人化狀態規則。",
                     CreatedAt = createdAt.AddHours(2),
                     UpdatedAt = createdAt.AddHours(2)
                 },
@@ -68,6 +70,7 @@ public static class DatabaseInitializer
                 {
                     Id = Guid.Parse("3c3f0c5d-5d8f-4dac-9e2c-3a4f5e6d7c83"),
                     Title = "部署至測試環境並驗證",
+                    Description = null,
                     CreatedAt = createdAt.AddHours(3),
                     UpdatedAt = createdAt.AddHours(3)
                 });

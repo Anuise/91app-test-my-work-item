@@ -11,7 +11,13 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ get: getCookie }),
 }));
 
-vi.mock("next/navigation", () => ({ redirect }));
+// 頁面內嵌的 WorkItemsList 會使用 router/pathname/searchParams 還原列表脈絡，需一併模擬。
+vi.mock("next/navigation", () => ({
+  redirect,
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/work-items",
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 describe("工作項目登入狀態", () => {
   beforeEach(() => {

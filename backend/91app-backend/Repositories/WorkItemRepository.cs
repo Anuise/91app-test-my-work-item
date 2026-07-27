@@ -36,6 +36,31 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<WorkItemDetail?> GetDetailForUserAsync(
+        Guid userId,
+        Guid workItemId,
+        CancellationToken cancellationToken)
+    {
+        // ADR 0005：以 LEFT JOIN 取得個人化狀態；無紀錄者於投影隱式視為 Pending。
+        // 已軟刪除項目未來將由 Global Query Filter 自動排除（ADR 0013），此處以存在與否作為 active 判定。
+        return await (
+                from workItem in context.WorkItems
+                where workItem.Id == workItemId
+                join status in context.UserWorkItemStatuses
+                    on workItem.Id equals status.WorkItemId into statusGroup
+                from status in statusGroup.Where(item => item.UserId == userId).DefaultIfEmpty()
+                select new WorkItemDetail(
+                    workItem.Id,
+                    workItem.Title,
+                    workItem.Description,
+                    status != null && status.Status == WorkItemStatus.Confirmed
+                        ? WorkItemStatus.Confirmed
+                        : WorkItemStatus.Pending,
+                    workItem.CreatedAt,
+                    workItem.UpdatedAt))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> ConfirmForUserAsync(
         Guid userId,
         IReadOnlyCollection<Guid> workItemIds,

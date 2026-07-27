@@ -34,6 +34,40 @@ export async function fetchWorkItems(sortOrder: SortOrder): Promise<WorkItemList
   return payload.data;
 }
 
+export type WorkItemDetail = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: WorkItemStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type WorkItemDetailSuccess = {
+  success: true;
+  data: WorkItemDetail;
+  message: string;
+};
+
+type WorkItemDetailFailure = {
+  success: false;
+  data: null;
+  message: string;
+  errors: string[];
+  traceId?: string;
+};
+
+export async function fetchWorkItem(id: string): Promise<WorkItemDetail> {
+  const response = await fetch(`/api/work-items/${id}`);
+  const payload = await response.json() as WorkItemDetailSuccess | WorkItemDetailFailure;
+
+  if (!response.ok || !payload.success) {
+    throw payload;
+  }
+
+  return payload.data;
+}
+
 export type BulkConfirmResult = {
   confirmedCount: number;
   ignoredCount: number;

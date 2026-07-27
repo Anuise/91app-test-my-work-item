@@ -324,6 +324,93 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         secondBody.GetProperty("data").GetProperty("revoked").GetBoolean().Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Detail_without_token_returns_401()
+    {
+        var response = await _client.GetAsync($"/api/v1/work-items/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Detail_returns_fields_with_personalized_status_for_caller()
+    {
+        var workItemId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow.AddHours(-2);
+        var updatedAt = DateTimeOffset.UtcNow.AddHours(-1);
+        await ReplaceWorkItemsAsync(
+            (new WorkItem { Id = workItemId, Title = "詳情項目", Description = "詳細描述", CreatedAt = createdAt, UpdatedAt = updatedAt },
+             new UserWorkItemStatus
+             {
+                 UserId = UserId,
+                 WorkItemId = workItemId,
+                 Status = WorkItemStatus.Confirmed,
+                 ConfirmedAt = updatedAt,
+                 UpdatedAt = updatedAt
+             }));
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await GetWorkItemAsync(token, workItemId);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        var data = body.GetProperty("data");
+        data.GetProperty("id").GetString().Should().Be(workItemId.ToString());
+        data.GetProperty("title").GetString().Should().Be("詳情項目");
+        data.GetProperty("description").GetString().Should().Be("詳細描述");
+        data.GetProperty("status").GetString().Should().Be("Confirmed");
+        data.GetProperty("createdAt").GetDateTimeOffset().Should().BeCloseTo(createdAt, TimeSpan.FromSeconds(1));
+        data.GetProperty("updatedAt").GetDateTimeOffset().Should().BeCloseTo(updatedAt, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task Detail_status_is_isolated_per_user()
+    {
+        var workItemId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow.AddHours(-1);
+        await ReplaceWorkItemsAsync(
+            (new WorkItem { Id = workItemId, Title = "共用詳情項目", CreatedAt = createdAt, UpdatedAt = createdAt },
+             new UserWorkItemStatus
+             {
+                 UserId = UserId,
+                 WorkItemId = workItemId,
+                 Status = WorkItemStatus.Confirmed,
+                 ConfirmedAt = createdAt,
+                 UpdatedAt = createdAt
+             }));
+        var userToken = await LoginAsync("user", UserClientHash);
+        var adminToken = await LoginAsync("admin", AdminClientHash);
+
+        var userBody = await (await GetWorkItemAsync(userToken, workItemId)).Content.ReadFromJsonAsync<JsonElement>();
+        var adminBody = await (await GetWorkItemAsync(adminToken, workItemId)).Content.ReadFromJsonAsync<JsonElement>();
+
+        // 個人化隔離：呼叫者為 Confirmed，未建立狀態的其他使用者隱式視為 Pending。
+        userBody.GetProperty("data").GetProperty("status").GetString().Should().Be("Confirmed");
+        adminBody.GetProperty("data").GetProperty("status").GetString().Should().Be("Pending");
+    }
+
+    [Fact]
+    public async Task Detail_for_missing_item_returns_404_envelope()
+    {
+        await ReplaceWorkItemsAsync();
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await GetWorkItemAsync(token, Guid.NewGuid());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    private async Task<HttpResponseMessage> GetWorkItemAsync(string token, Guid workItemId)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/work-items/{workItemId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
     private async Task<HttpResponseMessage> RevokeAsync(string token, Guid workItemId)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/work-items/{workItemId}/revoke");

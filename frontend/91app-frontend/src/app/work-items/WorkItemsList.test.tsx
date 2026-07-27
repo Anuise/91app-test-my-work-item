@@ -1,7 +1,26 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import WorkItemsList from "./WorkItemsList";
+
+// 列表脈絡以 URL 為持久化來源；測試中模擬 next/navigation 與 next/link。
+const nav = vi.hoisted(() => ({ search: "", replace: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: nav.replace, push: vi.fn() }),
+  usePathname: () => "/work-items",
+  useSearchParams: () => new URLSearchParams(nav.search),
+}));
+
+vi.mock("next/link", () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  default: ({ children, href }: any) => <a href={href}>{children}</a>,
+}));
+
+beforeEach(() => {
+  nav.search = "";
+  nav.replace.mockReset();
+});
 
 function stubFetchReturning(data: unknown) {
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
@@ -258,5 +277,37 @@ describe("WorkItemsList", () => {
     // 保留 Confirmed 狀態，撤銷按鈕仍在可重試。
     expect(screen.getByText("已確認")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "撤銷 撰寫測試" })).toBeInTheDocument();
+  });
+
+  test("依 URL 排序脈絡還原排序並於詳情連結帶入脈絡", async () => {
+    nav.search = "sortOrder=asc";
+    const fetchMock = stubFetchReturning([
+      { id: "wi-1", title: "設定開發環境", status: "Pending", createdAt: "2026-07-26T01:00:00Z" },
+    ]);
+
+    render(<WorkItemsList />);
+    await screen.findByText("設定開發環境");
+
+    // 由 URL 還原為升冪查詢。
+    expect(fetchMock).toHaveBeenCalledWith("/api/work-items?sortOrder=asc");
+    // 詳情連結帶入目前排序脈絡，返回列表時即可還原。
+    expect(screen.getByRole("link", { name: "設定開發環境" })).toHaveAttribute(
+      "href",
+      "/work-items/wi-1?sortOrder=asc",
+    );
+  });
+
+  test("切換排序方向時同步寫入 URL 以保留脈絡", async () => {
+    stubFetchReturning([]);
+    const user = userEvent.setup();
+
+    render(<WorkItemsList />);
+    await screen.findByText("目前沒有任何工作項目");
+
+    await user.click(screen.getByRole("button", { name: /建立時間/ }));
+
+    await waitFor(() => {
+      expect(nav.replace).toHaveBeenCalledWith("/work-items?sortOrder=asc", { scroll: false });
+    });
   });
 });
