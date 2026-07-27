@@ -11,6 +11,12 @@ public sealed class WorkItemService(IWorkItemRepository workItemRepository) : IW
         CancellationToken cancellationToken) =>
         workItemRepository.GetWorkItemsForUserAsync(userId, sortOrder, cancellationToken);
 
+    public Task<WorkItemDetail?> GetDetailForUserAsync(
+        Guid userId,
+        Guid workItemId,
+        CancellationToken cancellationToken) =>
+        workItemRepository.GetDetailForUserAsync(userId, workItemId, cancellationToken);
+
     public async Task<BulkConfirmResult> BulkConfirmAsync(
         Guid userId,
         IReadOnlyList<Guid> workItemIds,

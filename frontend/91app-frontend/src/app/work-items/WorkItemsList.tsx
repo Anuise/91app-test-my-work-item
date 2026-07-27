@@ -8,6 +8,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, CheckCheck, Inbox, RotateCcw } from "lucide-react";
 import {
   bulkConfirmWorkItems,
@@ -30,7 +32,13 @@ const STATUS_STYLES = {
 
 function WorkItemsListInner() {
   const queryClient = useQueryClient();
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // 由 URL 還原排序方向，讓從詳情返回列表時保留原脈絡（分頁擴充後亦沿用）。
+  const [sortOrder, setSortOrder] = useState<SortOrder>(
+    searchParams.get("sortOrder") === "asc" ? "asc" : "desc",
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   // 待撤銷的項目；非 null 時顯示確認對話框，於實際變更前先取得使用者確認。
@@ -90,6 +98,20 @@ function WorkItemsListInner() {
     setSelectedIds(() => (allSelected ? new Set() : new Set(visibleIds)));
   }
 
+  function toggleSortOrder() {
+    const next: SortOrder = sortOrder === "desc" ? "asc" : "desc";
+    setSortOrder(next);
+    // 同步寫入 URL，作為列表脈絡的持久化來源，返回列表時即可還原。
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("sortOrder", next);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  // 進入詳情時帶上目前列表脈絡（排序方向），返回時即可還原原位置。
+  const listQuery = new URLSearchParams(searchParams.toString());
+  listQuery.set("sortOrder", sortOrder);
+  const listQueryString = listQuery.toString();
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -107,7 +129,7 @@ function WorkItemsListInner() {
           <button
             type="button"
             className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-4 text-sm font-medium text-slate-700 transition duration-200 ease-in-out hover:border-blue-300 hover:text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-500"
-            onClick={() => setSortOrder((current) => (current === "desc" ? "asc" : "desc"))}
+            onClick={toggleSortOrder}
           >
             {sortOrder === "desc" ? (
               <ArrowDownNarrowWide className="size-4" aria-hidden="true" />
@@ -177,7 +199,14 @@ function WorkItemsListInner() {
                       />
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{item.id}</td>
-                    <td className="px-4 py-3 text-slate-900">{item.title}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/work-items/${item.id}?${listQueryString}`}
+                        className="font-medium text-slate-900 underline-offset-2 transition duration-200 ease-in-out hover:text-blue-600 hover:underline focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        {item.title}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[item.status]}`}>
                         {STATUS_LABELS[item.status]}

@@ -60,6 +60,36 @@ public sealed class WorkItemsController(IWorkItemService workItemService) : Cont
         return Ok(ApiResponse<IReadOnlyList<WorkItemListItem>>.Ok(items, "取得工作項目列表成功"));
     }
 
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType<ApiResponse<WorkItemDetail>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetWorkItem(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var subject = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (!Guid.TryParse(subject, out var userId))
+        {
+            return Unauthorized(ApiResponse<object>.Fail(
+                "登入狀態無效",
+                ["Token identity claims are incomplete"],
+                HttpContext.TraceIdentifier));
+        }
+
+        var detail = await workItemService.GetDetailForUserAsync(userId, id, cancellationToken);
+        if (detail is null)
+        {
+            // 詳情只回傳 active Work Item；不存在或已刪除時回傳一致的錯誤 envelope。
+            return NotFound(ApiResponse<object>.Fail(
+                "找不到工作項目",
+                ["Work item not found"],
+                HttpContext.TraceIdentifier));
+        }
+
+        return Ok(ApiResponse<WorkItemDetail>.Ok(detail, "取得工作項目詳情成功"));
+    }
+
     [HttpPost("bulk-confirm")]
     [ProducesResponseType<ApiResponse<BulkConfirmResult>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status400BadRequest)]

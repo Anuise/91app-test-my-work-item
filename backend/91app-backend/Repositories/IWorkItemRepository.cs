@@ -9,6 +9,12 @@ public interface IWorkItemRepository
         WorkItemSortOrder sortOrder,
         CancellationToken cancellationToken);
 
+    // 取得單筆 active Work Item 詳情並依登入者解析個人化狀態；項目不存在時回傳 null。
+    Task<WorkItemDetail?> GetDetailForUserAsync(
+        Guid userId,
+        Guid workItemId,
+        CancellationToken cancellationToken);
+
     // 將指定使用者對多筆 Work Item 的狀態冪等 upsert 為 Confirmed，回傳實際被確認的（仍存在的）項目數量。
     Task<int> ConfirmForUserAsync(
         Guid userId,

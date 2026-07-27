@@ -25,6 +25,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         workItem.ToTable("WorkItems");
         workItem.HasKey(item => item.Id);
         workItem.Property(item => item.Title).HasMaxLength(200).IsRequired();
+        workItem.Property(item => item.Description).HasMaxLength(2000);
         workItem.Property(item => item.CreatedAt).IsRequired();
         workItem.Property(item => item.UpdatedAt).IsRequired();
 
