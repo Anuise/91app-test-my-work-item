@@ -53,4 +53,35 @@ describe("工作項目登入狀態", () => {
     );
     expect(redirect).not.toHaveBeenCalled();
   });
+
+  test("Admin 看得到後台管理入口", async () => {
+    vi.mocked(fetch).mockImplementation(async (url: string | URL | Request) => {
+      if (String(url).includes("/auth/session")) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { id: "admin-id", name: "Admin", role: "Admin" },
+          message: "登入狀態有效",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({ success: true, data: [], message: "取得工作項目列表成功" }));
+    });
+
+    render(await WorkItemsPage());
+
+    expect(screen.getByRole("link", { name: "後台管理" })).toHaveAttribute("href", "/admin/work-items");
+  });
+
+  test("一般 User 看不到後台管理入口", async () => {
+    render(await WorkItemsPage());
+
+    expect(screen.queryByRole("link", { name: "後台管理" })).not.toBeInTheDocument();
+  });
+
+  test("權限不足導回列表時顯示 Toast 回饋", async () => {
+    render(await WorkItemsPage({ searchParams: Promise.resolve({ notice: "forbidden" }) }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("權限不足，無法進入後台管理");
+    expect(screen.getByRole("alert")).toHaveClass("fixed");
+  });
 });

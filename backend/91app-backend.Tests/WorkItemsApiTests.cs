@@ -404,9 +404,103 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
     }
 
+    [Fact]
+    public async Task Admin_list_without_token_returns_401_envelope()
+    {
+        var response = await _client.GetAsync("/api/v1/admin/work-items");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_list_as_user_returns_403_envelope()
+    {
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await GetAdminWorkItemsAsync(token);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_can_create_work_item_visible_in_admin_and_user_lists()
+    {
+        await ReplaceWorkItemsAsync();
+        var adminToken = await LoginAsync("admin", AdminClientHash);
+        var userToken = await LoginAsync("user", UserClientHash);
+
+        var response = await CreateAdminWorkItemAsync(adminToken, "新工作項目", "建立流程測試");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        body.GetProperty("data").GetProperty("title").GetString().Should().Be("新工作項目");
+        body.GetProperty("data").GetProperty("description").GetString().Should().Be("建立流程測試");
+
+        var adminBody = await (await GetAdminWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
+        adminBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("title").GetString().Should().Be("新工作項目");
+
+        var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
+        userBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("title").GetString().Should().Be("新工作項目");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Admin_create_rejects_blank_title_with_validation_envelope(string title)
+    {
+        var token = await LoginAsync("admin", AdminClientHash);
+
+        var response = await CreateAdminWorkItemAsync(token, title, null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("errors").EnumerateArray().Should().Contain(error => error.GetString() == "title 不可為空白");
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_create_as_user_returns_403()
+    {
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await CreateAdminWorkItemAsync(token, "不可建立", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     private async Task<HttpResponseMessage> GetWorkItemAsync(string token, Guid workItemId)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/work-items/{workItemId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
+    private async Task<HttpResponseMessage> GetAdminWorkItemsAsync(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/admin/work-items");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
+    private async Task<HttpResponseMessage> CreateAdminWorkItemAsync(
+        string token,
+        string title,
+        string? description)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/admin/work-items")
+        {
+            Content = JsonContent.Create(new { title, description })
+        };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return await _client.SendAsync(request);
     }
