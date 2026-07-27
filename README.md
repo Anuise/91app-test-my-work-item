@@ -147,6 +147,18 @@ npm run lint
 npm run build
 ```
 
+Playwright E2E 走真實瀏覽器跨前後端驗證三條 demo 主線（前台確認／持久化／撤銷／詳情返回、後台 CRUD 反映前台、跨使用者狀態隔離）。E2E 打的是「已經跑起來的整套服務」，需先啟動一鍵展示環境：
+
+```powershell
+docker compose up -d --wait
+Set-Location e2e
+npm ci
+npx playwright install chromium
+npm test
+```
+
+測試沿用 seed 帳號並在結束時還原自己動過的狀態，可重複執行。若前後端跑在其他位址，用 `E2E_BASE_URL` 覆寫（預設 `http://localhost:3000`）。
+
 ## 面試 Smoke Path
 
 為避免 HttpOnly session cookie 互相覆蓋，使用三個獨立瀏覽器 profile，或在每次切換帳號前清除 `localhost` cookie。
