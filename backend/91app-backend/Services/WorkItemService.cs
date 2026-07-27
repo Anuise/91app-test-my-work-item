@@ -22,4 +22,13 @@ public sealed class WorkItemService(IWorkItemRepository workItemRepository) : IW
         var ignoredCount = distinctIds.Count - confirmedCount;
         return new BulkConfirmResult(confirmedCount, ignoredCount);
     }
+
+    public async Task<RevokeResult> RevokeAsync(
+        Guid userId,
+        Guid workItemId,
+        CancellationToken cancellationToken)
+    {
+        var revoked = await workItemRepository.RevokeForUserAsync(userId, workItemId, cancellationToken);
+        return new RevokeResult(revoked);
+    }
 }

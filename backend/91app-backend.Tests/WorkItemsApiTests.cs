@@ -240,6 +240,97 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         body.GetProperty("message").GetString().Should().Contain("已被移除");
     }
 
+    [Fact]
+    public async Task Revoke_without_token_returns_401()
+    {
+        var response = await _client.PostAsync($"/api/v1/work-items/{Guid.NewGuid()}/revoke", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Revoke_reverts_confirmed_item_to_pending_for_caller()
+    {
+        var item = NewWorkItem("待撤銷項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var token = await LoginAsync("user", UserClientHash);
+        await BulkConfirmAsync(token, item.Id);
+
+        var response = await RevokeAsync(token, item.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        body.GetProperty("data").GetProperty("revoked").GetBoolean().Should().BeTrue();
+
+        // 撤銷後列表反映恢復為 Pending。
+        var listBody = await (await GetWorkItemsAsync(token)).Content.ReadFromJsonAsync<JsonElement>();
+        listBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("status").GetString().Should().Be("Pending");
+    }
+
+    [Fact]
+    public async Task Revoke_does_not_affect_other_users()
+    {
+        var item = NewWorkItem("共用已確認項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var userToken = await LoginAsync("user", UserClientHash);
+        var adminToken = await LoginAsync("admin", AdminClientHash);
+        await BulkConfirmAsync(userToken, item.Id);
+        await BulkConfirmAsync(adminToken, item.Id);
+
+        await RevokeAsync(userToken, item.Id);
+
+        // 僅呼叫者恢復為 Pending，其他使用者維持 Confirmed。
+        var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
+        var adminBody = await (await GetWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
+        userBody.GetProperty("data").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Pending");
+        adminBody.GetProperty("data").EnumerateArray().Single().GetProperty("status").GetString().Should().Be("Confirmed");
+    }
+
+    [Fact]
+    public async Task Revoke_on_non_confirmed_item_is_noop_and_returns_revoked_false()
+    {
+        var item = NewWorkItem("尚未確認項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        // 服務轉換規則：非 Confirmed 不可撤銷，回傳 revoked=false 且狀態維持 Pending。
+        var response = await RevokeAsync(token, item.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("data").GetProperty("revoked").GetBoolean().Should().BeFalse();
+
+        var listBody = await (await GetWorkItemsAsync(token)).Content.ReadFromJsonAsync<JsonElement>();
+        listBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("status").GetString().Should().Be("Pending");
+    }
+
+    [Fact]
+    public async Task Revoke_is_idempotent_on_repeated_submission()
+    {
+        var item = NewWorkItem("重複撤銷項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var token = await LoginAsync("user", UserClientHash);
+        await BulkConfirmAsync(token, item.Id);
+
+        var first = await RevokeAsync(token, item.Id);
+        var second = await RevokeAsync(token, item.Id);
+
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var secondBody = await second.Content.ReadFromJsonAsync<JsonElement>();
+        firstBody.GetProperty("data").GetProperty("revoked").GetBoolean().Should().BeTrue();
+        secondBody.GetProperty("data").GetProperty("revoked").GetBoolean().Should().BeFalse();
+    }
+
+    private async Task<HttpResponseMessage> RevokeAsync(string token, Guid workItemId)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/work-items/{workItemId}/revoke");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
     private static WorkItem NewWorkItem(string title, int hoursOffset)
     {
         var createdAt = DateTimeOffset.UtcNow.AddHours(hoursOffset);

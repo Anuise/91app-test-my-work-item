@@ -68,3 +68,35 @@ export async function bulkConfirmWorkItems(workItemIds: string[]): Promise<BulkC
 
   return { ...payload.data, message: payload.message };
 }
+
+export type RevokeResult = {
+  revoked: boolean;
+  message: string;
+};
+
+type RevokeSuccess = {
+  success: true;
+  data: { revoked: boolean };
+  message: string;
+};
+
+type RevokeFailure = {
+  success: false;
+  data: null;
+  message: string;
+  errors: string[];
+  traceId?: string;
+};
+
+export async function revokeWorkItem(workItemId: string): Promise<RevokeResult> {
+  const response = await fetch(`/api/work-items/${workItemId}/revoke`, {
+    method: "POST",
+  });
+  const payload = await response.json() as RevokeSuccess | RevokeFailure;
+
+  if (!response.ok || !payload.success) {
+    throw payload;
+  }
+
+  return { ...payload.data, message: payload.message };
+}
