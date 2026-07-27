@@ -20,8 +20,11 @@ type Feedback = {
   text: string;
 };
 
-export function AdminWorkItemsList({ items: initialItems }: AdminWorkItemsListProps) {
-  const [items, setItems] = useState(initialItems);
+export function AdminWorkItemsList({ items: fetchedItems }: AdminWorkItemsListProps) {
+  // 以 props 為單一資料來源：把 props 複製進 state 會讓 React Query 重新取得的結果被忽略，
+  // 造成新增／編輯後導回列表看到的是舊快取。刪除只記下已移除的 id。
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const items = fetchedItems.filter((item) => !removedIds.includes(item.id));
   const [deleteTarget, setDeleteTarget] = useState<AdminWorkItem | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -35,7 +38,7 @@ export function AdminWorkItemsList({ items: initialItems }: AdminWorkItemsListPr
     setIsDeleting(true);
     try {
       await authedFetch(`/api/admin/work-items/${target.id}`, { method: "DELETE" });
-      setItems((current) => current.filter((item) => item.id !== target.id));
+      setRemovedIds((current) => [...current, target.id]);
       setFeedback({ type: "success", text: "刪除成功" });
       setDeleteTarget(null);
     } catch (reason) {
