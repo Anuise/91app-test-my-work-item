@@ -12,6 +12,16 @@ public interface IWorkItemService
         string? description,
         CancellationToken cancellationToken);
 
+    Task<AdminWorkItemListItem?> GetAdminWorkItemAsync(
+        Guid workItemId,
+        CancellationToken cancellationToken);
+
+    Task<UpdatedWorkItem?> UpdateAsync(
+        Guid workItemId,
+        string title,
+        string? description,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,

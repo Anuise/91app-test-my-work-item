@@ -206,6 +206,7 @@ function WorkItemsListInner() {
                       >
                         {item.title}
                       </Link>
+                      {item.description ? <p className="mt-1 text-xs text-slate-500">{item.description}</p> : null}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[item.status]}`}>
