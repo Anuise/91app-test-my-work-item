@@ -3,6 +3,7 @@ export type WorkItemStatus = "Pending" | "Confirmed";
 export type WorkItemListItem = {
   id: string;
   title: string;
+  description: string | null;
   status: WorkItemStatus;
   createdAt: string;
 };

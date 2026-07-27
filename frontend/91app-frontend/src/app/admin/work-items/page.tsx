@@ -24,7 +24,7 @@ type AdminWorkItemsPayload = {
 export default async function AdminWorkItemsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string }>;
 }) {
   const accessToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
   const response = await fetch(`${BACKEND_API_URL}/api/v1/admin/work-items`, {
@@ -34,7 +34,7 @@ export default async function AdminWorkItemsPage({
   const payload = await response.json() as AdminWorkItemsPayload;
   const items = response.ok && payload.success ? payload.data : [];
   const loadError = response.ok && payload.success ? "" : payload.message;
-  const { created } = await searchParams;
+  const { created, updated } = await searchParams;
 
   return (
     <main className="min-h-screen px-5 py-8 text-slate-900 sm:px-8">
@@ -51,6 +51,11 @@ export default async function AdminWorkItemsPage({
               工作項目建立成功。
             </p>
           ) : null}
+          {updated === "1" ? (
+            <p className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
+              工作項目更新成功。
+            </p>
+          ) : null}
           {loadError ? (
             <p className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
               {loadError}
@@ -63,8 +68,18 @@ export default async function AdminWorkItemsPage({
             <ul className="mt-8 divide-y divide-slate-200">
               {items.map((item) => (
                 <li className="py-5" key={item.id}>
-                  <p className="font-semibold text-slate-900">{item.title}</p>
-                  {item.description ? <p className="mt-1 text-sm text-slate-600">{item.description}</p> : null}
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-slate-900">{item.title}</p>
+                      {item.description ? <p className="mt-1 text-sm text-slate-600">{item.description}</p> : null}
+                    </div>
+                    <Link
+                      className="shrink-0 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                      href={`/admin/work-items/${item.id}/edit`}
+                    >
+                      編輯
+                    </Link>
+                  </div>
                 </li>
               ))}
             </ul>

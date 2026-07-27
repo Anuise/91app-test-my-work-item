@@ -50,13 +50,14 @@ describe("WorkItemsList", () => {
 
   test("每列顯示識別碼、標題與個人化狀態", async () => {
     stubFetchReturning([
-      { id: "wi-1", title: "設定開發環境", status: "Pending", createdAt: "2026-07-26T01:00:00Z" },
-      { id: "wi-2", title: "撰寫測試", status: "Confirmed", createdAt: "2026-07-26T02:00:00Z" },
+      { id: "wi-1", title: "設定開發環境", description: "更新後描述", status: "Pending", createdAt: "2026-07-26T01:00:00Z" },
+      { id: "wi-2", title: "撰寫測試", description: null, status: "Confirmed", createdAt: "2026-07-26T02:00:00Z" },
     ]);
 
     render(<WorkItemsList />);
 
     expect(await screen.findByText("設定開發環境")).toBeInTheDocument();
+    expect(screen.getByText("更新後描述")).toBeInTheDocument();
     expect(screen.getByText("wi-1")).toBeInTheDocument();
     expect(screen.getByText("待確認")).toBeInTheDocument();
     expect(screen.getByText("撰寫測試")).toBeInTheDocument();

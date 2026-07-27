@@ -28,6 +28,16 @@ describe("Admin 工作項目管理", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("工作項目建立成功。");
     expect(screen.getByText("新的工作項目")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "編輯" })).toHaveAttribute(
+      "href",
+      "/admin/work-items/work-item-id/edit",
+    );
+  });
+
+  test("更新成功時顯示成功訊息", async () => {
+    render(await AdminWorkItemsPage({ searchParams: Promise.resolve({ updated: "1" }) }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("工作項目更新成功。");
   });
 
   test("API 失敗 envelope 會顯示錯誤並保留空列表", async () => {

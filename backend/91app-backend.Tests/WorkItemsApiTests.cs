@@ -478,6 +478,149 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Admin_can_get_work_item_for_edit()
+    {
+        var item = NewWorkItem("編輯前標題", -1);
+        item.Description = "編輯前描述";
+        await ReplaceWorkItemsAsync((item, null));
+        var token = await LoginAsync("admin", AdminClientHash);
+
+        var response = await GetAdminWorkItemAsync(token, item.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("data").GetProperty("title").GetString().Should().Be("編輯前標題");
+        body.GetProperty("data").GetProperty("description").GetString().Should().Be("編輯前描述");
+    }
+
+    [Fact]
+    public async Task Admin_get_missing_item_returns_404_envelope()
+    {
+        await ReplaceWorkItemsAsync();
+        var token = await LoginAsync("admin", AdminClientHash);
+
+        var response = await GetAdminWorkItemAsync(token, Guid.NewGuid());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("data").ValueKind.Should().Be(JsonValueKind.Null);
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_get_work_item_without_token_returns_401_envelope()
+    {
+        var response = await _client.GetAsync($"/api/v1/admin/work-items/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_get_work_item_as_user_returns_403()
+    {
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await GetAdminWorkItemAsync(token, Guid.NewGuid());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Admin_update_is_visible_in_admin_and_user_lists()
+    {
+        var item = NewWorkItem("編輯前標題", -1);
+        item.Description = "編輯前描述";
+        await ReplaceWorkItemsAsync((item, null));
+        var adminToken = await LoginAsync("admin", AdminClientHash);
+        var userToken = await LoginAsync("user", UserClientHash);
+
+        var response = await UpdateAdminWorkItemAsync(
+            adminToken,
+            item.Id,
+            "更新後標題",
+            "更新後描述");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        body.GetProperty("data").GetProperty("title").GetString().Should().Be("更新後標題");
+        body.GetProperty("data").GetProperty("description").GetString().Should().Be("更新後描述");
+
+        var adminBody = await (await GetAdminWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
+        adminBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("title").GetString().Should().Be("更新後標題");
+        adminBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("description").GetString().Should().Be("更新後描述");
+
+        var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
+        userBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("title").GetString().Should().Be("更新後標題");
+        userBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("description").GetString().Should().Be("更新後描述");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Admin_update_rejects_blank_title_with_validation_envelope(string title)
+    {
+        var item = NewWorkItem("保留標題", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var token = await LoginAsync("admin", AdminClientHash);
+
+        var response = await UpdateAdminWorkItemAsync(token, item.Id, title, "描述");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("errors").EnumerateArray()
+            .Should().Contain(error => error.GetString() == "title 不可為空白");
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_update_for_missing_item_returns_404_envelope()
+    {
+        await ReplaceWorkItemsAsync();
+        var token = await LoginAsync("admin", AdminClientHash);
+
+        var response = await UpdateAdminWorkItemAsync(token, Guid.NewGuid(), "新標題", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("data").ValueKind.Should().Be(JsonValueKind.Null);
+        body.GetProperty("errors").EnumerateArray()
+            .Should().Contain(error => error.GetString() == "Work item not found");
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_update_without_token_returns_401_envelope()
+    {
+        var response = await UpdateAdminWorkItemAsync(null, Guid.NewGuid(), "新標題", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_update_as_user_returns_403()
+    {
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await UpdateAdminWorkItemAsync(token, Guid.NewGuid(), "新標題", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     private async Task<HttpResponseMessage> GetWorkItemAsync(string token, Guid workItemId)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/work-items/{workItemId}");
@@ -492,6 +635,13 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         return await _client.SendAsync(request);
     }
 
+    private async Task<HttpResponseMessage> GetAdminWorkItemAsync(string token, Guid workItemId)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/admin/work-items/{workItemId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
     private async Task<HttpResponseMessage> CreateAdminWorkItemAsync(
         string token,
         string title,
@@ -502,6 +652,24 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
             Content = JsonContent.Create(new { title, description })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
+    private async Task<HttpResponseMessage> UpdateAdminWorkItemAsync(
+        string? token,
+        Guid workItemId,
+        string title,
+        string? description)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/admin/work-items/{workItemId}")
+        {
+            Content = JsonContent.Create(new { title, description })
+        };
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
         return await _client.SendAsync(request);
     }
 

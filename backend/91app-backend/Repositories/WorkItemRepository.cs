@@ -38,6 +38,43 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
         return new CreatedWorkItem(workItem.Id, workItem.Title, workItem.Description, workItem.CreatedAt);
     }
 
+    public async Task<AdminWorkItemListItem?> GetAdminWorkItemAsync(
+        Guid workItemId,
+        CancellationToken cancellationToken) =>
+        await context.WorkItems
+            .Where(item => item.Id == workItemId)
+            .Select(item => new AdminWorkItemListItem(
+                item.Id,
+                item.Title,
+                item.Description,
+                item.CreatedAt))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<UpdatedWorkItem?> UpdateAsync(
+        Guid workItemId,
+        string title,
+        string? description,
+        CancellationToken cancellationToken)
+    {
+        var workItem = await context.WorkItems
+            .FirstOrDefaultAsync(item => item.Id == workItemId, cancellationToken);
+        if (workItem is null)
+        {
+            return null;
+        }
+
+        workItem.Title = title;
+        workItem.Description = description;
+        workItem.UpdatedAt = DateTimeOffset.UtcNow;
+        await context.SaveChangesAsync(cancellationToken);
+        return new UpdatedWorkItem(
+            workItem.Id,
+            workItem.Title,
+            workItem.Description,
+            workItem.CreatedAt,
+            workItem.UpdatedAt);
+    }
+
     public async Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,
@@ -60,6 +97,7 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
             .Select(item => new WorkItemListItem(
                 item.workItem.Id,
                 item.workItem.Title,
+                item.workItem.Description,
                 item.status != null && item.status.Status == WorkItemStatus.Confirmed
                     ? WorkItemStatus.Confirmed
                     : WorkItemStatus.Pending,

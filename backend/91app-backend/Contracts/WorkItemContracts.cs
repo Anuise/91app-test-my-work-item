@@ -11,6 +11,7 @@ public enum WorkItemSortOrder
 public sealed record WorkItemListItem(
     Guid Id,
     string Title,
+    string? Description,
     WorkItemStatus Status,
     DateTimeOffset CreatedAt);
 
@@ -43,3 +44,12 @@ public sealed record CreatedWorkItem(
     string Title,
     string? Description,
     DateTimeOffset CreatedAt);
+
+public sealed record UpdateWorkItemRequest(string? Title, string? Description);
+
+public sealed record UpdatedWorkItem(
+    Guid Id,
+    string Title,
+    string? Description,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
