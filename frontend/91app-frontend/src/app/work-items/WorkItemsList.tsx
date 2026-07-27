@@ -302,14 +302,21 @@ export default function WorkItemsList() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 last:border-0">
+                {items.map((item) => {
+                  const isSelected = selectedIds.has(item.id);
+                  return (
+                  // 勾選後整列以淡藍底標示，提供「已選中」視覺回饋；aria-selected 同步給輔助技術。
+                  <tr
+                    key={item.id}
+                    aria-selected={isSelected}
+                    className={`border-b border-slate-100 last:border-0 ${isSelected ? "bg-blue-50/70" : ""}`}
+                  >
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         aria-label={`選取 ${item.title}`}
                         className="size-4 cursor-pointer accent-blue-600"
-                        checked={selectedIds.has(item.id)}
+                        checked={isSelected}
                         onChange={() => toggleRow(item.id)}
                       />
                     </td>
@@ -332,17 +339,18 @@ export default function WorkItemsList() {
                       {item.status === "Confirmed" ? (
                         <button
                           type="button"
-                          aria-label={`撤銷 ${item.title}`}
+                          aria-label={`撤銷確認 ${item.title}`}
                           className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white/70 px-3 text-sm font-medium text-slate-700 transition duration-200 ease-in-out hover:border-red-300 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-blue-500"
                           onClick={() => setRevokeTarget(item)}
                         >
                           <RotateCcw className="size-4" aria-hidden="true" />
-                          撤銷
+                          撤銷確認
                         </button>
                       ) : null}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
