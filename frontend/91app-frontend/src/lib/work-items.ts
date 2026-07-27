@@ -12,8 +12,39 @@ export type WorkItemListItem = {
 
 export type SortOrder = "asc" | "desc";
 
-export async function fetchWorkItems(sortOrder: SortOrder): Promise<WorkItemListItem[]> {
-  const { data } = await authedFetch<WorkItemListItem[]>(`/api/work-items?sortOrder=${sortOrder}`);
+// ADR 0015：排序欄位白名單；ADR 0012：個人化狀態過濾三態。
+export type SortBy = "createdAt" | "title";
+export type StatusFilter = "All" | "Pending" | "Confirmed";
+
+// ADR 0015：每頁固定 20 筆。
+export const PAGE_SIZE = 20;
+
+export type WorkItemListQuery = {
+  search: string;
+  statusFilter: StatusFilter;
+  sortBy: SortBy;
+  sortOrder: SortOrder;
+  page: number;
+};
+
+// ADR 0015：列表回應為分頁物件，totalCount 為過濾後總數供前端渲染分頁控制。
+export type PagedWorkItems = {
+  items: WorkItemListItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+};
+
+export async function fetchWorkItems(query: WorkItemListQuery): Promise<PagedWorkItems> {
+  const params = new URLSearchParams({
+    search: query.search,
+    statusFilter: query.statusFilter,
+    sortBy: query.sortBy,
+    sortOrder: query.sortOrder,
+    page: String(query.page),
+    pageSize: String(PAGE_SIZE),
+  });
+  const { data } = await authedFetch<PagedWorkItems>(`/api/work-items?${params.toString()}`);
   return data;
 }
 

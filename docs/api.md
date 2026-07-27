@@ -48,7 +48,7 @@
 
 | Method | Route | 說明 |
 | --- | --- | --- |
-| `GET` | `/api/v1/work-items?sortBy=createdAt&sortOrder=desc` | 取得 active Work Items 與呼叫者的個人狀態；`sortOrder` 支援 `asc`、`desc` |
+| `GET` | `/api/v1/work-items?search=&statusFilter=All&sortBy=createdAt&sortOrder=desc&page=1&pageSize=20` | 取得 active Work Items 與呼叫者的個人狀態；`search` 對標題／描述做不分大小寫子字串比對，`statusFilter` 支援 `All`／`Pending`／`Confirmed`，`sortBy` 支援 `createdAt`／`title`，`sortOrder` 支援 `asc`／`desc`（白名單外的值靜默回退預設）；回應 `data` 為 `{ items, page, pageSize, totalCount }` |
 | `GET` | `/api/v1/work-items/{id}` | 取得詳情與呼叫者的個人狀態 |
 | `POST` | `/api/v1/work-items/bulk-confirm` | 將呼叫者選取的 Work Items 冪等更新為 `Confirmed` |
 | `POST` | `/api/v1/work-items/{id}/revoke` | 將呼叫者的單筆狀態恢復為 `Pending` |

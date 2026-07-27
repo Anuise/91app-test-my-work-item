@@ -28,6 +28,8 @@ public interface IWorkItemRepository
 
     Task<PagedWorkItems> GetWorkItemsForUserAsync(
         Guid userId,
+        string? search,
+        WorkItemStatusFilter statusFilter,
         WorkItemSortField sortField,
         WorkItemSortOrder sortOrder,
         int page,
