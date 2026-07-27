@@ -26,9 +26,12 @@ public interface IWorkItemRepository
         Guid workItemId,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
+    Task<PagedWorkItems> GetWorkItemsForUserAsync(
         Guid userId,
+        WorkItemSortField sortField,
         WorkItemSortOrder sortOrder,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken);
 
     // 取得單筆 active Work Item 詳情並依登入者解析個人化狀態；項目不存在時回傳 null。

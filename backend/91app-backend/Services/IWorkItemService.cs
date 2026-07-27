@@ -26,9 +26,12 @@ public interface IWorkItemService
         Guid workItemId,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
+    Task<PagedWorkItems> GetWorkItemsForUserAsync(
         Guid userId,
+        WorkItemSortField sortField,
         WorkItemSortOrder sortOrder,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken);
 
     Task<WorkItemDetail?> GetDetailForUserAsync(

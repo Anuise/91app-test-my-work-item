@@ -8,12 +8,26 @@ public enum WorkItemSortOrder
     Descending
 }
 
+// 排序欄位白名單（ADR 0015）：僅允許 createdAt 與 title，避免任意欄位排序。
+public enum WorkItemSortField
+{
+    CreatedAt,
+    Title
+}
+
 public sealed record WorkItemListItem(
     Guid Id,
     string Title,
     string? Description,
     WorkItemStatus Status,
     DateTimeOffset CreatedAt);
+
+// 列表分頁結果（ADR 0015）：items 為當前頁項目，totalCount 為過濾後總數供前端渲染分頁控制。
+public sealed record PagedWorkItems(
+    IReadOnlyList<WorkItemListItem> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
 
 // 詳情：包含 Work Item 完整欄位與依登入者解析的個人化狀態。
 // UpdatedAt 為 Work Item 本身的最後更新時間（項目稽核時間戳）。
