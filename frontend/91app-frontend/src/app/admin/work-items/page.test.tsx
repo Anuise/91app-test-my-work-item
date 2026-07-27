@@ -31,7 +31,7 @@ describe("Admin 工作項目管理", () => {
 
     renderWithProviders(<AdminWorkItemsPage />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("工作項目建立成功。");
+    expect(screen.getByRole("status")).toHaveTextContent("工作項目新增成功。");
     expect(await screen.findByText("新的工作項目")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "編輯" })).toHaveAttribute(
       "href",

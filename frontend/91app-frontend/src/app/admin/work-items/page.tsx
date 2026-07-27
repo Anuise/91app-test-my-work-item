@@ -30,7 +30,7 @@ export default function AdminWorkItemsPage() {
         <div className="mt-10 rounded-2xl border border-white/50 bg-white/75 p-8 shadow-xl shadow-blue-900/5 backdrop-blur-md sm:p-12">
           {created === "1" ? (
             <p className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
-              工作項目建立成功。
+              工作項目新增成功。
             </p>
           ) : null}
           {updated === "1" ? (

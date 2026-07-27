@@ -38,6 +38,7 @@ describe("AdminWorkItemsList", () => {
 
     await user.click(screen.getByRole("button", { name: "刪除 待刪除項目" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "確定要刪除此項目嗎？" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "取消" }));
 
@@ -62,7 +63,7 @@ describe("AdminWorkItemsList", () => {
     await user.click(screen.getByRole("button", { name: "刪除 待刪除項目" }));
     await user.click(screen.getByRole("button", { name: "確認刪除" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("刪除工作項目成功");
+    expect(await screen.findByRole("status")).toHaveTextContent("刪除成功");
     expect(screen.queryByText("待刪除項目")).not.toBeInTheDocument();
     const [path, init] = fetchMock.mock.calls[0];
     expect(path).toBe("/api/admin/work-items/work-item-id");
