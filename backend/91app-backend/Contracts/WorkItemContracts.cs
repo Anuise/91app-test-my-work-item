@@ -29,3 +29,17 @@ public sealed record BulkConfirmRequest(IReadOnlyList<Guid> WorkItemIds);
 public sealed record BulkConfirmResult(int ConfirmedCount, int IgnoredCount);
 
 public sealed record RevokeResult(bool Revoked);
+
+public sealed record AdminWorkItemListItem(
+    Guid Id,
+    string Title,
+    string? Description,
+    DateTimeOffset CreatedAt);
+
+public sealed record CreateWorkItemRequest(string? Title, string? Description);
+
+public sealed record CreatedWorkItem(
+    Guid Id,
+    string Title,
+    string? Description,
+    DateTimeOffset CreatedAt);

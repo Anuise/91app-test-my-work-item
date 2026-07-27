@@ -4,6 +4,14 @@ namespace _91app_backend.Services;
 
 public interface IWorkItemService
 {
+    Task<IReadOnlyList<AdminWorkItemListItem>> GetAdminWorkItemsAsync(
+        CancellationToken cancellationToken);
+
+    Task<CreatedWorkItem> CreateAsync(
+        string title,
+        string? description,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,

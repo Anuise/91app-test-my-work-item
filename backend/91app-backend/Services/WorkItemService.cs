@@ -5,6 +5,16 @@ namespace _91app_backend.Services;
 
 public sealed class WorkItemService(IWorkItemRepository workItemRepository) : IWorkItemService
 {
+    public Task<IReadOnlyList<AdminWorkItemListItem>> GetAdminWorkItemsAsync(
+        CancellationToken cancellationToken) =>
+        workItemRepository.GetAdminWorkItemsAsync(cancellationToken);
+
+    public Task<CreatedWorkItem> CreateAsync(
+        string title,
+        string? description,
+        CancellationToken cancellationToken) =>
+        workItemRepository.CreateAsync(title, description, cancellationToken);
+
     public Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,

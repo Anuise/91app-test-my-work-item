@@ -7,6 +7,37 @@ namespace _91app_backend.Repositories;
 
 public sealed class WorkItemRepository(AppDbContext context) : IWorkItemRepository
 {
+    public async Task<IReadOnlyList<AdminWorkItemListItem>> GetAdminWorkItemsAsync(
+        CancellationToken cancellationToken) =>
+        await context.WorkItems
+            .OrderByDescending(item => item.CreatedAt)
+            .ThenByDescending(item => item.Id)
+            .Select(item => new AdminWorkItemListItem(
+                item.Id,
+                item.Title,
+                item.Description,
+                item.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+    public async Task<CreatedWorkItem> CreateAsync(
+        string title,
+        string? description,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var workItem = new WorkItem
+        {
+            Id = Guid.NewGuid(),
+            Title = title,
+            Description = description,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        context.WorkItems.Add(workItem);
+        await context.SaveChangesAsync(cancellationToken);
+        return new CreatedWorkItem(workItem.Id, workItem.Title, workItem.Description, workItem.CreatedAt);
+    }
+
     public async Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,
