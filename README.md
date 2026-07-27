@@ -159,7 +159,7 @@ npm test
 
 測試沿用 seed 帳號並在結束時還原自己動過的狀態，可重複執行。若前後端跑在其他位址，用 `E2E_BASE_URL` 覆寫（預設 `http://localhost:3000`）。
 
-## 面試 Smoke Path
+## Smoke Path
 
 為避免 HttpOnly session cookie 互相覆蓋，使用三個獨立瀏覽器 profile，或在每次切換帳號前清除 `localhost` cookie。
 
