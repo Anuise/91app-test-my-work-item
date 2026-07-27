@@ -17,12 +17,21 @@ public sealed class WorkItemsController(IWorkItemService workItemService) : Cont
     [ProducesResponseType<ApiResponse<PagedWorkItems>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetWorkItems(
+        [FromQuery] string? search = null,
+        [FromQuery] string statusFilter = "All",
         [FromQuery] string sortBy = "createdAt",
         [FromQuery] string sortOrder = "desc",
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
+        // ADR 0012：statusFilter 白名單外的值與 sortBy／sortOrder 同樣靜默 fallback 回預設（All）。
+        var status = string.Equals(statusFilter, "Pending", StringComparison.OrdinalIgnoreCase)
+            ? WorkItemStatusFilter.Pending
+            : string.Equals(statusFilter, "Confirmed", StringComparison.OrdinalIgnoreCase)
+                ? WorkItemStatusFilter.Confirmed
+                : WorkItemStatusFilter.All;
+
         // ADR 0015：sortBy／sortOrder 白名單外的值靜默 fallback 回預設（createdAt / desc），不回 400。
         var sortField = string.Equals(sortBy, "title", StringComparison.OrdinalIgnoreCase)
             ? WorkItemSortField.Title
@@ -51,7 +60,8 @@ public sealed class WorkItemsController(IWorkItemService workItemService) : Cont
                 HttpContext.TraceIdentifier));
         }
 
-        var result = await workItemService.GetWorkItemsForUserAsync(userId, sortField, order, page, pageSize, cancellationToken);
+        var result = await workItemService.GetWorkItemsForUserAsync(
+            userId, search, status, sortField, order, page, pageSize, cancellationToken);
         return Ok(ApiResponse<PagedWorkItems>.Ok(result, "取得工作項目列表成功"));
     }
 

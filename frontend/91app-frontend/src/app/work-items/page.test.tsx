@@ -19,7 +19,7 @@ describe("工作項目受保護頁面", () => {
     replace.mockReset();
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       success: true,
-      data: [],
+      data: { items: [], page: 1, pageSize: 20, totalCount: 0 },
       message: "取得工作項目列表成功",
     }), { status: 200 })));
   });
@@ -37,7 +37,8 @@ describe("工作項目受保護頁面", () => {
     renderWithProviders(<WorkItemsPage />);
 
     expect(await screen.findByRole("heading", { name: "我的工作項目" })).toBeInTheDocument();
-    expect(replace).not.toHaveBeenCalled();
+    // 列表會把查詢脈絡寫回 URL，故只斷言未被導回登入頁。
+    expect(replace).not.toHaveBeenCalledWith("/");
   });
 
   test("Admin 看得到後台管理入口", async () => {

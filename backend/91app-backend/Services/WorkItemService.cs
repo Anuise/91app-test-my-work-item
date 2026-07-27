@@ -34,12 +34,15 @@ public sealed class WorkItemService(IWorkItemRepository workItemRepository) : IW
 
     public Task<PagedWorkItems> GetWorkItemsForUserAsync(
         Guid userId,
+        string? search,
+        WorkItemStatusFilter statusFilter,
         WorkItemSortField sortField,
         WorkItemSortOrder sortOrder,
         int page,
         int pageSize,
         CancellationToken cancellationToken) =>
-        workItemRepository.GetWorkItemsForUserAsync(userId, sortField, sortOrder, page, pageSize, cancellationToken);
+        workItemRepository.GetWorkItemsForUserAsync(
+            userId, search, statusFilter, sortField, sortOrder, page, pageSize, cancellationToken);
 
     public Task<WorkItemDetail?> GetDetailForUserAsync(
         Guid userId,

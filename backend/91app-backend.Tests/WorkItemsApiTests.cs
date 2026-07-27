@@ -241,6 +241,118 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         data.GetProperty("pageSize").GetInt32().Should().Be(20);
     }
 
+    [Theory]
+    [InlineData("開發")]
+    [InlineData("開發環境")]
+    [InlineData("SETUP")]
+    public async Task Search_matches_title_case_insensitively(string keyword)
+    {
+        await ReplaceWorkItemsAsync(
+            (NewWorkItem("setup 開發環境", -1), null),
+            (NewWorkItem("撰寫測試", -2), null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        var body = await (await GetWorkItemsAsync(token, search: keyword))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        var data = body.GetProperty("data");
+        data.GetProperty("totalCount").GetInt32().Should().Be(1);
+        data.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("title").GetString())
+            .Should().Equal("setup 開發環境");
+    }
+
+    [Fact]
+    public async Task Search_also_matches_description()
+    {
+        var withDescription = NewWorkItem("標題無關鍵字", -1);
+        withDescription.Description = "描述裡才有 Docker 關鍵字";
+        await ReplaceWorkItemsAsync(
+            (withDescription, null),
+            (NewWorkItem("撰寫測試", -2), null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        var body = await (await GetWorkItemsAsync(token, search: "docker"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        var data = body.GetProperty("data");
+        data.GetProperty("totalCount").GetInt32().Should().Be(1);
+        data.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("title").GetString())
+            .Should().Equal("標題無關鍵字");
+    }
+
+    [Fact]
+    public async Task Status_filter_is_applied_to_personalized_status_of_caller()
+    {
+        // 已確認項目對 user 而言是 Confirmed，對其他人仍是隱式 Pending。
+        var confirmedId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow.AddHours(-1);
+        await ReplaceWorkItemsAsync(
+            (new WorkItem { Id = confirmedId, Title = "已確認項目", CreatedAt = createdAt, UpdatedAt = createdAt },
+             new UserWorkItemStatus
+             {
+                 UserId = UserId,
+                 WorkItemId = confirmedId,
+                 Status = WorkItemStatus.Confirmed,
+                 ConfirmedAt = createdAt,
+                 UpdatedAt = createdAt
+             }),
+            (NewWorkItem("待確認項目", -2), null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        var pending = await (await GetWorkItemsAsync(token, statusFilter: "Pending"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var confirmed = await (await GetWorkItemsAsync(token, statusFilter: "Confirmed"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        // 無個人化紀錄者視為 Pending，須被 Pending 過濾器納入。
+        pending.GetProperty("data").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("title").GetString())
+            .Should().Equal("待確認項目");
+        pending.GetProperty("data").GetProperty("totalCount").GetInt32().Should().Be(1);
+
+        confirmed.GetProperty("data").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("title").GetString())
+            .Should().Equal("已確認項目");
+        confirmed.GetProperty("data").GetProperty("totalCount").GetInt32().Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("bogus")]
+    [InlineData("All")]
+    public async Task Status_filter_outside_whitelist_falls_back_to_all(string statusFilter)
+    {
+        // ADR 0012：白名單外的 statusFilter 靜默 fallback 回 All，回 200。
+        await SeedWorkItemsAsync(3);
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await GetWorkItemsAsync(token, statusFilter: statusFilter);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var data = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        data.GetProperty("items").GetArrayLength().Should().Be(3);
+        data.GetProperty("totalCount").GetInt32().Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Search_narrows_total_count_used_for_pagination()
+    {
+        await ReplaceWorkItemsAsync(
+            (NewWorkItem("報告 A", -1), null),
+            (NewWorkItem("報告 B", -2), null),
+            (NewWorkItem("與關鍵字無關", -3), null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        var body = await (await GetWorkItemsAsync(token, search: "報告", page: 1, pageSize: 1))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        var data = body.GetProperty("data");
+        // totalCount 為過濾後總數（2），而非全庫總數（3）。
+        data.GetProperty("totalCount").GetInt32().Should().Be(2);
+        data.GetProperty("items").GetArrayLength().Should().Be(1);
+    }
+
     [Fact]
     public async Task Bulk_confirm_without_token_returns_401()
     {
@@ -920,13 +1032,17 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         string? sortOrder = null,
         string? sortBy = null,
         int? page = null,
-        int? pageSize = null)
+        int? pageSize = null,
+        string? search = null,
+        string? statusFilter = null)
     {
         var query = new List<string>();
         if (sortOrder is not null) query.Add($"sortOrder={sortOrder}");
         if (sortBy is not null) query.Add($"sortBy={sortBy}");
         if (page is not null) query.Add($"page={page}");
         if (pageSize is not null) query.Add($"pageSize={pageSize}");
+        if (search is not null) query.Add($"search={Uri.EscapeDataString(search)}");
+        if (statusFilter is not null) query.Add($"statusFilter={statusFilter}");
         var uri = query.Count == 0 ? "/api/v1/work-items" : $"/api/v1/work-items?{string.Join("&", query)}";
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

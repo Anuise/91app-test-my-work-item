@@ -15,6 +15,14 @@ public enum WorkItemSortField
     Title
 }
 
+// 個人化狀態過濾器（ADR 0012）：All 不過濾，Pending／Confirmed 針對呼叫者解析後的狀態。
+public enum WorkItemStatusFilter
+{
+    All,
+    Pending,
+    Confirmed
+}
+
 public sealed record WorkItemListItem(
     Guid Id,
     string Title,

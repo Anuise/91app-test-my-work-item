@@ -94,6 +94,8 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
 
     public async Task<PagedWorkItems> GetWorkItemsForUserAsync(
         Guid userId,
+        string? search,
+        WorkItemStatusFilter statusFilter,
         WorkItemSortField sortField,
         WorkItemSortOrder sortOrder,
         int page,
@@ -108,8 +110,27 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
             from status in statusGroup.Where(item => item.UserId == userId).DefaultIfEmpty()
             select new { workItem, status };
 
+        // ADR 0012：search 對 Title 與 Description 做不區分大小寫的子字串比對。
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var keyword = search.Trim().ToLower();
+            joined = joined.Where(item =>
+                item.workItem.Title.ToLower().Contains(keyword)
+                || (item.workItem.Description != null && item.workItem.Description.ToLower().Contains(keyword)));
+        }
+
+        // ADR 0012：statusFilter 作用於呼叫者解析後的個人化狀態；無紀錄者視為 Pending。
+        joined = statusFilter switch
+        {
+            WorkItemStatusFilter.Pending =>
+                joined.Where(item => item.status == null || item.status.Status != WorkItemStatus.Confirmed),
+            WorkItemStatusFilter.Confirmed =>
+                joined.Where(item => item.status != null && item.status.Status == WorkItemStatus.Confirmed),
+            _ => joined,
+        };
+
         // ADR 0015：totalCount 為過濾後總數（軟刪除項目由 Global Query Filter 排除），於分頁前計算。
-        var totalCount = await context.WorkItems.CountAsync(cancellationToken);
+        var totalCount = await joined.CountAsync(cancellationToken);
 
         // 以 Id 作為次要排序鍵，避免主鍵排序值相同時排序不穩定。
         var ascending = sortOrder == WorkItemSortOrder.Ascending;
