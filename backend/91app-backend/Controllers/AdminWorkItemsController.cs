@@ -108,4 +108,25 @@ public sealed class AdminWorkItemsController(IWorkItemService workItemService) :
 
         return Ok(ApiResponse<UpdatedWorkItem>.Ok(updated, "更新工作項目成功"));
     }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiResponse<object>>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteWorkItem(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var deleted = await workItemService.DeleteAsync(id, cancellationToken);
+        if (!deleted)
+        {
+            return NotFound(ApiResponse<object>.Fail(
+                "找不到工作項目",
+                ["Work item not found"],
+                HttpContext.TraceIdentifier));
+        }
+
+        return Ok(ApiResponse<object>.Ok(new { id }, "刪除工作項目成功"));
+    }
 }

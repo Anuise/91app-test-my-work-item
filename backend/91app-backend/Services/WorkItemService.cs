@@ -27,6 +27,11 @@ public sealed class WorkItemService(IWorkItemRepository workItemRepository) : IW
         CancellationToken cancellationToken) =>
         workItemRepository.UpdateAsync(workItemId, title, description, cancellationToken);
 
+    public Task<bool> DeleteAsync(
+        Guid workItemId,
+        CancellationToken cancellationToken) =>
+        workItemRepository.DeleteAsync(workItemId, cancellationToken);
+
     public Task<IReadOnlyList<WorkItemListItem>> GetWorkItemsForUserAsync(
         Guid userId,
         WorkItemSortOrder sortOrder,

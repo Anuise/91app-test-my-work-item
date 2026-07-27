@@ -8,4 +8,5 @@ public sealed class WorkItem
     public string? Description { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
 }

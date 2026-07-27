@@ -241,6 +241,25 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
     }
 
     [Fact]
+    public async Task Bulk_confirm_ignores_soft_deleted_ids_with_200_and_message()
+    {
+        var item = NewWorkItem("已刪除項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var adminToken = await LoginAsync("admin", AdminClientHash);
+        var userToken = await LoginAsync("user", UserClientHash);
+        var deleteResponse = await DeleteAdminWorkItemAsync(adminToken, item.Id);
+
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var response = await BulkConfirmAsync(userToken, item.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("data").GetProperty("confirmedCount").GetInt32().Should().Be(0);
+        body.GetProperty("data").GetProperty("ignoredCount").GetInt32().Should().Be(1);
+        body.GetProperty("message").GetString().Should().Contain("已被移除");
+    }
+
+    [Fact]
     public async Task Revoke_without_token_returns_401()
     {
         var response = await _client.PostAsync($"/api/v1/work-items/{Guid.NewGuid()}/revoke", null);
@@ -621,6 +640,86 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Admin_delete_soft_deletes_item_and_preserves_status_history()
+    {
+        var item = NewWorkItem("待刪除項目", -1);
+        var originalUpdatedAt = item.UpdatedAt;
+        await ReplaceWorkItemsAsync(
+            (item, new UserWorkItemStatus
+            {
+                UserId = UserId,
+                WorkItemId = item.Id,
+                Status = WorkItemStatus.Confirmed,
+                ConfirmedAt = originalUpdatedAt,
+                UpdatedAt = originalUpdatedAt
+            }));
+        var adminToken = await LoginAsync("admin", AdminClientHash);
+        var userToken = await LoginAsync("user", UserClientHash);
+
+        var response = await DeleteAdminWorkItemAsync(adminToken, item.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        body.GetProperty("message").GetString().Should().Be("刪除工作項目成功");
+
+        var adminBody = await (await GetAdminWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
+        adminBody.GetProperty("data").GetArrayLength().Should().Be(0);
+        var userBody = await (await GetWorkItemsAsync(userToken)).Content.ReadFromJsonAsync<JsonElement>();
+        userBody.GetProperty("data").GetArrayLength().Should().Be(0);
+        var detailResponse = await GetWorkItemAsync(userToken, item.Id);
+        detailResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var storedItem = await context.WorkItems
+            .IgnoreQueryFilters()
+            .SingleAsync(workItem => workItem.Id == item.Id);
+        storedItem.IsDeleted.Should().BeTrue();
+        storedItem.UpdatedAt.Should().BeAfter(originalUpdatedAt);
+        context.UserWorkItemStatuses.Should().ContainSingle(status =>
+            status.UserId == UserId && status.WorkItemId == item.Id);
+    }
+
+    [Fact]
+    public async Task Admin_delete_without_token_returns_401_envelope()
+    {
+        var response = await DeleteAdminWorkItemAsync(null, Guid.NewGuid());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Admin_delete_as_user_returns_403()
+    {
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await DeleteAdminWorkItemAsync(token, Guid.NewGuid());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Admin_delete_for_missing_item_returns_404_envelope()
+    {
+        await ReplaceWorkItemsAsync();
+        var token = await LoginAsync("admin", AdminClientHash);
+
+        var response = await DeleteAdminWorkItemAsync(token, Guid.NewGuid());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("data").ValueKind.Should().Be(JsonValueKind.Null);
+        body.GetProperty("errors").EnumerateArray()
+            .Should().Contain(error => error.GetString() == "Work item not found");
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
     private async Task<HttpResponseMessage> GetWorkItemAsync(string token, Guid workItemId)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/work-items/{workItemId}");
@@ -673,6 +772,19 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         return await _client.SendAsync(request);
     }
 
+    private async Task<HttpResponseMessage> DeleteAdminWorkItemAsync(
+        string? token,
+        Guid workItemId)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/v1/admin/work-items/{workItemId}");
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return await _client.SendAsync(request);
+    }
+
     private async Task<HttpResponseMessage> RevokeAsync(string token, Guid workItemId)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/work-items/{workItemId}/revoke");
@@ -716,7 +828,7 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         context.UserWorkItemStatuses.RemoveRange(context.UserWorkItemStatuses);
-        context.WorkItems.RemoveRange(context.WorkItems);
+        context.WorkItems.RemoveRange(context.WorkItems.IgnoreQueryFilters());
         await context.SaveChangesAsync();
 
         foreach (var (workItem, status) in items)
