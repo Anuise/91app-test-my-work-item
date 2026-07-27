@@ -1,0 +1,7 @@
+**/bin
+**/obj
+**/.vs
+**/.vscode
+91app-backend.Tests
+*.user
+*.http
