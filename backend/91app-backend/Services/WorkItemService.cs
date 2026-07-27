@@ -10,4 +10,16 @@ public sealed class WorkItemService(IWorkItemRepository workItemRepository) : IW
         WorkItemSortOrder sortOrder,
         CancellationToken cancellationToken) =>
         workItemRepository.GetWorkItemsForUserAsync(userId, sortOrder, cancellationToken);
+
+    public async Task<BulkConfirmResult> BulkConfirmAsync(
+        Guid userId,
+        IReadOnlyList<Guid> workItemIds,
+        CancellationToken cancellationToken)
+    {
+        // 去除重複 ID，避免同一項目被重複計數。
+        var distinctIds = workItemIds.Distinct().ToList();
+        var confirmedCount = await workItemRepository.ConfirmForUserAsync(userId, distinctIds, cancellationToken);
+        var ignoredCount = distinctIds.Count - confirmedCount;
+        return new BulkConfirmResult(confirmedCount, ignoredCount);
+    }
 }

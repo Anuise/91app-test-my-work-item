@@ -33,3 +33,38 @@ export async function fetchWorkItems(sortOrder: SortOrder): Promise<WorkItemList
 
   return payload.data;
 }
+
+export type BulkConfirmResult = {
+  confirmedCount: number;
+  ignoredCount: number;
+  message: string;
+};
+
+type BulkConfirmSuccess = {
+  success: true;
+  data: { confirmedCount: number; ignoredCount: number };
+  message: string;
+};
+
+type BulkConfirmFailure = {
+  success: false;
+  data: null;
+  message: string;
+  errors: string[];
+  traceId?: string;
+};
+
+export async function bulkConfirmWorkItems(workItemIds: string[]): Promise<BulkConfirmResult> {
+  const response = await fetch("/api/work-items/bulk-confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workItemIds }),
+  });
+  const payload = await response.json() as BulkConfirmSuccess | BulkConfirmFailure;
+
+  if (!response.ok || !payload.success) {
+    throw payload;
+  }
+
+  return { ...payload.data, message: payload.message };
+}

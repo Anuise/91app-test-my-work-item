@@ -35,4 +35,55 @@ public sealed class WorkItemRepository(AppDbContext context) : IWorkItemReposito
                 item.workItem.CreatedAt))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<int> ConfirmForUserAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> workItemIds,
+        CancellationToken cancellationToken)
+    {
+        // 僅針對目前仍存在的 Work Item 確認；已刪除或不存在的 ID 於此自動被過濾（ADR 0013）。
+        var existingIds = await context.WorkItems
+            .Where(item => workItemIds.Contains(item.Id))
+            .Select(item => item.Id)
+            .ToListAsync(cancellationToken);
+
+        if (existingIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var existingStatuses = await context.UserWorkItemStatuses
+            .Where(status => status.UserId == userId && existingIds.Contains(status.WorkItemId))
+            .ToDictionaryAsync(status => status.WorkItemId, cancellationToken);
+
+        foreach (var workItemId in existingIds)
+        {
+            if (existingStatuses.TryGetValue(workItemId, out var status))
+            {
+                // 冪等：已確認者僅更新時間戳，尚未確認者轉為 Confirmed 並記錄首次確認時間。
+                if (status.Status != WorkItemStatus.Confirmed)
+                {
+                    status.Status = WorkItemStatus.Confirmed;
+                    status.ConfirmedAt = now;
+                }
+
+                status.UpdatedAt = now;
+            }
+            else
+            {
+                context.UserWorkItemStatuses.Add(new UserWorkItemStatus
+                {
+                    UserId = userId,
+                    WorkItemId = workItemId,
+                    Status = WorkItemStatus.Confirmed,
+                    ConfirmedAt = now,
+                    UpdatedAt = now
+                });
+            }
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        return existingIds.Count;
+    }
 }

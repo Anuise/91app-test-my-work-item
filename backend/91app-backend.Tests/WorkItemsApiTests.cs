@@ -141,6 +141,121 @@ public sealed class WorkItemsApiTests : IClassFixture<WorkItemsApiFactory>
         titles.Should().Equal(expectedTitles);
     }
 
+    [Fact]
+    public async Task Bulk_confirm_without_token_returns_401()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/work-items/bulk-confirm",
+            new { workItemIds = new[] { Guid.NewGuid() } });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Bulk_confirm_with_empty_list_returns_400()
+    {
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await BulkConfirmAsync(token);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeFalse();
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Bulk_confirm_persists_selected_items_as_confirmed_for_caller()
+    {
+        var first = NewWorkItem("項目一", -3);
+        var second = NewWorkItem("項目二", -2);
+        await ReplaceWorkItemsAsync((first, null), (second, null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        var response = await BulkConfirmAsync(token, first.Id, second.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("success").GetBoolean().Should().BeTrue();
+        body.GetProperty("data").GetProperty("confirmedCount").GetInt32().Should().Be(2);
+        body.GetProperty("data").GetProperty("ignoredCount").GetInt32().Should().Be(0);
+
+        // 成功後列表反映最新狀態。
+        var listBody = await (await GetWorkItemsAsync(token)).Content.ReadFromJsonAsync<JsonElement>();
+        listBody.GetProperty("data").EnumerateArray()
+            .Select(item => item.GetProperty("status").GetString())
+            .Should().OnlyContain(status => status == "Confirmed");
+    }
+
+    [Fact]
+    public async Task Bulk_confirm_does_not_affect_other_users()
+    {
+        var item = NewWorkItem("共用項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var userToken = await LoginAsync("user", UserClientHash);
+        var adminToken = await LoginAsync("admin", AdminClientHash);
+
+        await BulkConfirmAsync(userToken, item.Id);
+
+        var adminBody = await (await GetWorkItemsAsync(adminToken)).Content.ReadFromJsonAsync<JsonElement>();
+        adminBody.GetProperty("data").EnumerateArray().Single()
+            .GetProperty("status").GetString().Should().Be("Pending");
+    }
+
+    [Fact]
+    public async Task Bulk_confirm_is_idempotent_on_repeated_submission()
+    {
+        var item = NewWorkItem("重複提交項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var token = await LoginAsync("user", UserClientHash);
+
+        await BulkConfirmAsync(token, item.Id);
+        var second = await BulkConfirmAsync(token, item.Id);
+
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await second.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("data").GetProperty("confirmedCount").GetInt32().Should().Be(1);
+
+        // 重複提交不會產生第二筆狀態紀錄。
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await context.UserWorkItemStatuses.CountAsync(status => status.WorkItemId == item.Id))
+            .Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Bulk_confirm_ignores_missing_ids_with_200_and_message()
+    {
+        var item = NewWorkItem("有效項目", -1);
+        await ReplaceWorkItemsAsync((item, null));
+        var token = await LoginAsync("user", UserClientHash);
+        var missingId = Guid.NewGuid();
+
+        var response = await BulkConfirmAsync(token, item.Id, missingId);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("data").GetProperty("confirmedCount").GetInt32().Should().Be(1);
+        body.GetProperty("data").GetProperty("ignoredCount").GetInt32().Should().Be(1);
+        body.GetProperty("message").GetString().Should().Contain("已被移除");
+    }
+
+    private static WorkItem NewWorkItem(string title, int hoursOffset)
+    {
+        var createdAt = DateTimeOffset.UtcNow.AddHours(hoursOffset);
+        return new WorkItem { Id = Guid.NewGuid(), Title = title, CreatedAt = createdAt, UpdatedAt = createdAt };
+    }
+
+    private async Task<HttpResponseMessage> BulkConfirmAsync(string token, params Guid[] workItemIds)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/work-items/bulk-confirm")
+        {
+            Content = JsonContent.Create(new { workItemIds })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
     private async Task<string> LoginAsync(string username, string clientHash)
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new { username, clientHash });
